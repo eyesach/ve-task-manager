@@ -6,6 +6,8 @@ import { TaskManagementLog } from '@/components/tasks/TaskManagementLog'
 import { TaskDetail } from '@/components/tasks/TaskDetail'
 import { ToastContainer } from '@/components/common/Toast'
 import { useUIStore } from '@/stores/uiStore'
+import { CalendarView } from '@/components/calendar/CalendarView'
+import { DashboardView } from '@/components/dashboard/DashboardView'
 
 function PlaceholderView({ title }: { title: string }) {
   return (
@@ -28,12 +30,12 @@ export default function App() {
     <BrowserRouter>
       <AppShell>
         <Routes>
-          <Route path="/" element={<PlaceholderView title="Dashboard" />} />
+          <Route path="/" element={<DashboardView />} />
           <Route path="/department/:abbr" element={<TaskView />} />
           <Route path="/inter-department" element={<TaskView viewOverride="inter_department" />} />
           <Route path="/trade-shows" element={<TaskView viewOverride="trade_show" />} />
           <Route path="/competitions" element={<TaskView viewOverride="competition" />} />
-          <Route path="/calendar" element={<PlaceholderView title="Calendar" />} />
+          <Route path="/calendar" element={<CalendarView />} />
           <Route path="/print-requests" element={<PlaceholderView title="Print Requests" />} />
           <Route path="/settings" element={<PlaceholderView title="Settings" />} />
           <Route path="*" element={<Navigate to="/" replace />} />
