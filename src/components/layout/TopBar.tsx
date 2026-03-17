@@ -1,9 +1,12 @@
-import { Search, List, LayoutGrid } from 'lucide-react'
+import { useState } from 'react'
+import { Search, List, LayoutGrid, Plus, Table2 } from 'lucide-react'
 import { useLocation, useParams } from 'react-router-dom'
 import { useUIStore } from '@/stores/uiStore'
 import { useFilterStore } from '@/stores/filterStore'
+import { useTaskStore } from '@/stores/taskStore'
 import { DEPARTMENTS, TASK_STATUSES, TASK_PRIORITIES } from '@/lib/constants'
 import type { TaskStatus, TaskPriority } from '@/lib/types'
+import { TaskCreateModal } from '@/components/tasks/TaskCreateModal'
 
 function useViewTitle(): { title: string; subtitle?: string; color?: string } {
   const { pathname } = useLocation()
@@ -28,11 +31,22 @@ function useViewTitle(): { title: string; subtitle?: string; color?: string } {
 
 export function TopBar() {
   const { viewMode, setViewMode } = useUIStore()
-  const { statusFilter, priorityFilter, setStatusFilter, setPriorityFilter, searchQuery, setSearchQuery } =
-    useFilterStore()
+  const {
+    statusFilter,
+    priorityFilter,
+    assigneeFilter,
+    setStatusFilter,
+    setPriorityFilter,
+    setAssigneeFilter,
+    searchQuery,
+    setSearchQuery,
+  } = useFilterStore()
+  const { profiles } = useTaskStore()
   const { title, subtitle, color } = useViewTitle()
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   return (
+    <>
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle bg-surface-1 px-6">
       {/* Left: View title */}
       <div className="flex items-center gap-3">
@@ -47,8 +61,19 @@ export function TopBar() {
         )}
       </div>
 
-      {/* Right: Filters + Search + View toggle */}
+      {/* Right: New Task + Filters + Search + View toggle */}
       <div className="flex items-center gap-2">
+        {/* New Task button */}
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
+        >
+          <Plus size={14} />
+          New Task
+        </button>
+
+        {/* Separator */}
+        <div className="mx-1 h-5 w-px bg-border-subtle" />
         {/* Status filter */}
         <select
           value={statusFilter ?? ''}
@@ -73,6 +98,20 @@ export function TopBar() {
           {TASK_PRIORITIES.map((p) => (
             <option key={p.value} value={p.value}>
               {p.label}
+            </option>
+          ))}
+        </select>
+
+        {/* Assignee filter */}
+        <select
+          value={assigneeFilter ?? ''}
+          onChange={(e) => setAssigneeFilter(e.target.value || null)}
+          className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
+        >
+          <option value="">All Assignees</option>
+          {profiles.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.fullName}
             </option>
           ))}
         </select>
@@ -117,8 +156,20 @@ export function TopBar() {
           >
             <LayoutGrid size={14} />
           </button>
+          <button
+            onClick={() => setViewMode('log')}
+            className={`flex h-7 w-8 items-center justify-center border-l border-border-subtle transition-colors ${
+              viewMode === 'log'
+                ? 'bg-surface-3 text-text-primary'
+                : 'text-text-tertiary hover:text-text-secondary'
+            }`}
+          >
+            <Table2 size={14} />
+          </button>
         </div>
       </div>
     </header>
+    <TaskCreateModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
+    </>
   )
 }

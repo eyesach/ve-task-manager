@@ -1,8 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { TaskList } from '@/components/tasks/TaskList'
+import { TaskBoard } from '@/components/tasks/TaskBoard'
+import { TaskManagementLog } from '@/components/tasks/TaskManagementLog'
 import { TaskDetail } from '@/components/tasks/TaskDetail'
 import { ToastContainer } from '@/components/common/Toast'
+import { useUIStore } from '@/stores/uiStore'
 
 function PlaceholderView({ title }: { title: string }) {
   return (
@@ -13,16 +16,23 @@ function PlaceholderView({ title }: { title: string }) {
   )
 }
 
+function TaskView({ viewOverride }: { viewOverride?: string }) {
+  const viewMode = useUIStore((s) => s.viewMode)
+  if (viewMode === 'board') return <TaskBoard viewOverride={viewOverride} />
+  if (viewMode === 'log') return <TaskManagementLog viewOverride={viewOverride} />
+  return <TaskList viewOverride={viewOverride} />
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AppShell>
         <Routes>
           <Route path="/" element={<PlaceholderView title="Dashboard" />} />
-          <Route path="/department/:abbr" element={<TaskList />} />
-          <Route path="/inter-department" element={<TaskList viewOverride="inter_department" />} />
-          <Route path="/trade-shows" element={<TaskList viewOverride="trade_show" />} />
-          <Route path="/competitions" element={<TaskList viewOverride="competition" />} />
+          <Route path="/department/:abbr" element={<TaskView />} />
+          <Route path="/inter-department" element={<TaskView viewOverride="inter_department" />} />
+          <Route path="/trade-shows" element={<TaskView viewOverride="trade_show" />} />
+          <Route path="/competitions" element={<TaskView viewOverride="competition" />} />
           <Route path="/calendar" element={<PlaceholderView title="Calendar" />} />
           <Route path="/print-requests" element={<PlaceholderView title="Print Requests" />} />
           <Route path="/settings" element={<PlaceholderView title="Settings" />} />

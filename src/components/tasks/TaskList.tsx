@@ -33,9 +33,9 @@ function getTasksForView(
 }
 
 export function TaskList({ viewOverride }: TaskListProps) {
-  const { tasks, getTasksByDepartment, getTasksByCategory } = useTaskStore()
+  const { tasks, getTasksByDepartment, getTasksByCategory, assignees } = useTaskStore()
   const { abbr } = useParams<{ abbr: string }>()
-  const { statusFilter, priorityFilter, searchQuery } = useFilterStore()
+  const { statusFilter, priorityFilter, assigneeFilter, searchQuery } = useFilterStore()
 
   const activeView = viewOverride ?? (abbr ? getDepartmentByAbbr(abbr)?.id ?? '' : 'dashboard')
 
@@ -48,6 +48,12 @@ export function TaskList({ viewOverride }: TaskListProps) {
     if (priorityFilter) {
       result = result.filter((t) => t.priority === priorityFilter)
     }
+    if (assigneeFilter) {
+      const assigneeTaskIds = assignees
+        .filter((a) => a.profileId === assigneeFilter)
+        .map((a) => a.taskId)
+      result = result.filter((t) => assigneeTaskIds.includes(t.id))
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       result = result.filter(
@@ -59,7 +65,7 @@ export function TaskList({ viewOverride }: TaskListProps) {
     }
 
     return result.sort((a, b) => a.sortOrder - b.sortOrder)
-  }, [activeView, tasks, statusFilter, priorityFilter, searchQuery, getTasksByDepartment, getTasksByCategory])
+  }, [activeView, tasks, assignees, statusFilter, priorityFilter, assigneeFilter, searchQuery, getTasksByDepartment, getTasksByCategory])
 
   if (filteredTasks.length === 0) {
     return (
