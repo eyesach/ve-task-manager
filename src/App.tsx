@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { TaskList } from '@/components/tasks/TaskList'
@@ -5,6 +6,7 @@ import { TaskBoard } from '@/components/tasks/TaskBoard'
 import { TaskManagementLog } from '@/components/tasks/TaskManagementLog'
 import { TaskDetail } from '@/components/tasks/TaskDetail'
 import { ToastContainer } from '@/components/common/Toast'
+import { SearchOverlay } from '@/components/common/SearchOverlay'
 import { useUIStore } from '@/stores/uiStore'
 import { CalendarView } from '@/components/calendar/CalendarView'
 import { DashboardView } from '@/components/dashboard/DashboardView'
@@ -23,6 +25,19 @@ function TaskView({ viewOverride }: { viewOverride?: string }) {
 }
 
 export default function App() {
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   return (
     <BrowserRouter>
       <AppShell>
@@ -39,6 +54,7 @@ export default function App() {
         </Routes>
         <TaskDetail />
         <ToastContainer />
+        <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
       </AppShell>
     </BrowserRouter>
   )
