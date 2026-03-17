@@ -12,6 +12,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { ClipboardList } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useFilterStore } from '@/stores/filterStore'
+import { usePeriodStore } from '@/stores/periodStore'
 import { DEPARTMENTS, TASK_STATUSES, getDepartmentByAbbr } from '@/lib/constants'
 import { TaskCard } from './TaskCard'
 import type { Task, TaskStatus } from '@/lib/types'
@@ -98,6 +99,7 @@ export function TaskBoard({ viewOverride }: TaskBoardProps) {
   const { tasks, getTasksByDepartment, getTasksByCategory, updateTaskStatus } = useTaskStore()
   const { abbr } = useParams<{ abbr: string }>()
   const { statusFilter, priorityFilter, searchQuery } = useFilterStore()
+  const { activePeriodId } = usePeriodStore()
 
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null)
 
@@ -105,6 +107,8 @@ export function TaskBoard({ viewOverride }: TaskBoardProps) {
 
   const filteredTasks = useMemo(() => {
     let result = getTasksForView(activeView, getTasksByDepartment, getTasksByCategory, tasks)
+
+    result = result.filter((t) => t.taskPeriodId === activePeriodId)
 
     if (statusFilter) result = result.filter((t) => t.status === statusFilter)
     if (priorityFilter) result = result.filter((t) => t.priority === priorityFilter)
@@ -127,6 +131,7 @@ export function TaskBoard({ viewOverride }: TaskBoardProps) {
     statusFilter,
     priorityFilter,
     searchQuery,
+    activePeriodId,
     getTasksByDepartment,
     getTasksByCategory,
   ])

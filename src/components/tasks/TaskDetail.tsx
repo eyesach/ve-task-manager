@@ -10,11 +10,13 @@ import {
   Eye,
   Trash2,
   Star,
+  ArrowRight,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useUIStore } from '@/stores/uiStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { useToastStore } from '@/stores/toastStore'
+import { usePeriodStore } from '@/stores/periodStore'
 import {
   getDepartmentById,
   TASK_PRIORITIES,
@@ -38,12 +40,16 @@ export function TaskDetail() {
     updateTaskDescription,
     updateTask,
     deleteTask,
+    addTask,
+    addChecklistItem,
+    getChecklistForTask,
     addAssignee,
     removeAssignee,
     togglePrimaryAssignee,
     assignees: allAssignees,
   } = useTaskStore()
   const { addToast } = useToastStore()
+  const { getNextPeriod } = usePeriodStore()
   const panelRef = useRef<HTMLDivElement>(null)
 
   const [editingDescription, setEditingDescription] = useState(false)
@@ -102,6 +108,49 @@ export function TaskDetail() {
     if (!task) return
     deleteTask(task.id)
     addToast('success', 'Task deleted')
+    closeTaskDetail()
+  }
+
+  function handleCarryOver() {
+    if (!task) return
+    const nextPeriod = getNextPeriod()
+    if (!nextPeriod) {
+      addToast('error', 'No next period available')
+      return
+    }
+
+    // Mark current task as carried over
+    updateTask(task.id, { status: 'carried_over' })
+
+    // Create duplicate task in next period
+    const newTaskId = crypto.randomUUID()
+    const now = new Date().toISOString()
+    addTask({
+      ...task,
+      id: newTaskId,
+      taskPeriodId: nextPeriod.id,
+      status: 'not_started',
+      carriedFromPeriod: task.taskPeriodId,
+      actualCompletion: undefined,
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    // Duplicate checklist items with evidence reset
+    const checklistItems = getChecklistForTask(task.id)
+    for (const item of checklistItems) {
+      addChecklistItem({
+        ...item,
+        id: crypto.randomUUID(),
+        taskId: newTaskId,
+        isCompleted: false,
+        evidenceValue: undefined,
+        completedBy: undefined,
+        actualCompletion: undefined,
+      })
+    }
+
+    addToast('success', `Task carried over to ${nextPeriod.name}`)
     closeTaskDetail()
   }
 
@@ -182,6 +231,17 @@ export function TaskDetail() {
                 >
                   {editing ? <Eye size={15} /> : <Pencil size={15} />}
                 </button>
+
+                {/* Carry Over button — only for non-completed tasks */}
+                {task.status !== 'completed' && (
+                  <button
+                    onClick={handleCarryOver}
+                    title="Carry over to next period"
+                    className="flex h-8 w-8 items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-950"
+                  >
+                    <ArrowRight size={15} />
+                  </button>
+                )}
 
                 {/* Delete button */}
                 <button

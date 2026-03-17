@@ -5,6 +5,7 @@ import { ClipboardList } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useFilterStore } from '@/stores/filterStore'
 import { useUIStore } from '@/stores/uiStore'
+import { usePeriodStore } from '@/stores/periodStore'
 import { DEPARTMENTS, getDepartmentByAbbr } from '@/lib/constants'
 import { StatusChip } from '@/components/common/StatusChip'
 import type { Task } from '@/lib/types'
@@ -45,11 +46,14 @@ export function TaskManagementLog({ viewOverride }: TaskManagementLogProps) {
   const { abbr } = useParams<{ abbr: string }>()
   const { statusFilter, priorityFilter, assigneeFilter, searchQuery } = useFilterStore()
   const { openTaskDetail } = useUIStore()
+  const { activePeriodId } = usePeriodStore()
 
   const activeView = viewOverride ?? (abbr ? getDepartmentByAbbr(abbr)?.id ?? '' : 'dashboard')
 
   const filteredTasks = useMemo(() => {
     let result = getTasksForView(activeView, getTasksByDepartment, getTasksByCategory, tasks)
+
+    result = result.filter((t) => t.taskPeriodId === activePeriodId)
 
     if (statusFilter) {
       result = result.filter((t) => t.status === statusFilter)
@@ -82,6 +86,7 @@ export function TaskManagementLog({ viewOverride }: TaskManagementLogProps) {
     priorityFilter,
     assigneeFilter,
     searchQuery,
+    activePeriodId,
     getTasksByDepartment,
     getTasksByCategory,
   ])

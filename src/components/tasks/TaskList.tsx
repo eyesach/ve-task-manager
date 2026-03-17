@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { ClipboardList } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { useFilterStore } from '@/stores/filterStore'
+import { usePeriodStore } from '@/stores/periodStore'
 import { DEPARTMENTS, getDepartmentByAbbr } from '@/lib/constants'
 import { TaskRow } from './TaskRow'
 import type { Task } from '@/lib/types'
@@ -36,11 +37,14 @@ export function TaskList({ viewOverride }: TaskListProps) {
   const { tasks, getTasksByDepartment, getTasksByCategory, assignees } = useTaskStore()
   const { abbr } = useParams<{ abbr: string }>()
   const { statusFilter, priorityFilter, assigneeFilter, searchQuery } = useFilterStore()
+  const { activePeriodId } = usePeriodStore()
 
   const activeView = viewOverride ?? (abbr ? getDepartmentByAbbr(abbr)?.id ?? '' : 'dashboard')
 
   const filteredTasks = useMemo(() => {
     let result = getTasksForView(activeView, getTasksByDepartment, getTasksByCategory, tasks)
+
+    result = result.filter((t) => t.taskPeriodId === activePeriodId)
 
     if (statusFilter) {
       result = result.filter((t) => t.status === statusFilter)
@@ -65,7 +69,7 @@ export function TaskList({ viewOverride }: TaskListProps) {
     }
 
     return result.sort((a, b) => a.sortOrder - b.sortOrder)
-  }, [activeView, tasks, assignees, statusFilter, priorityFilter, assigneeFilter, searchQuery, getTasksByDepartment, getTasksByCategory])
+  }, [activeView, tasks, assignees, statusFilter, priorityFilter, assigneeFilter, searchQuery, activePeriodId, getTasksByDepartment, getTasksByCategory])
 
   if (filteredTasks.length === 0) {
     return (

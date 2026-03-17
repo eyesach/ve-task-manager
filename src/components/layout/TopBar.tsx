@@ -4,6 +4,7 @@ import { useLocation, useParams } from 'react-router-dom'
 import { useUIStore } from '@/stores/uiStore'
 import { useFilterStore } from '@/stores/filterStore'
 import { useTaskStore } from '@/stores/taskStore'
+import { usePeriodStore } from '@/stores/periodStore'
 import { DEPARTMENTS, TASK_STATUSES, TASK_PRIORITIES } from '@/lib/constants'
 import type { TaskStatus, TaskPriority } from '@/lib/types'
 import { TaskCreateModal } from '@/components/tasks/TaskCreateModal'
@@ -42,6 +43,7 @@ export function TopBar() {
     setSearchQuery,
   } = useFilterStore()
   const { profiles } = useTaskStore()
+  const { periods, activePeriodId, setActivePeriod } = usePeriodStore()
   const { title, subtitle, color } = useViewTitle()
   const [showCreateModal, setShowCreateModal] = useState(false)
 
@@ -71,6 +73,17 @@ export function TopBar() {
           <Plus size={14} />
           New Task
         </button>
+
+        {/* Period selector */}
+        <select
+          value={activePeriodId}
+          onChange={(e) => setActivePeriod(e.target.value)}
+          className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs font-medium text-text-primary outline-none transition-colors focus:border-border-strong"
+        >
+          {periods.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
 
         {/* Separator */}
         <div className="mx-1 h-5 w-px bg-border-subtle" />
