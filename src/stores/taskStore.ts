@@ -1,0 +1,295 @@
+import { create } from 'zustand'
+import type {
+  Task,
+  ChecklistItem,
+  TaskComment,
+  TaskDepartment,
+  TaskAssignee,
+  Profile,
+  TaskStatus,
+  TaskPriority,
+  TaskCategory,
+  EvidenceType,
+} from '@/lib/types'
+import {
+  MOCK_TASKS,
+  MOCK_CHECKLISTS,
+  MOCK_ASSIGNEES,
+  MOCK_PROFILES,
+  MOCK_COMMENTS,
+  MOCK_TASK_DEPARTMENTS,
+} from '@/lib/mockData'
+
+// Suppress unused-import lint warnings for re-exported types used only in JSDoc
+void (undefined as unknown as TaskPriority)
+void (undefined as unknown as TaskCategory)
+void (undefined as unknown as EvidenceType)
+
+interface TaskState {
+  tasks: Task[]
+  checklists: ChecklistItem[]
+  assignees: TaskAssignee[]
+  profiles: Profile[]
+  comments: TaskComment[]
+  taskDepartments: TaskDepartment[]
+
+  // --- Selectors (existing) ---
+  getTaskById: (id: string) => Task | undefined
+  getTasksByDepartment: (deptId: string) => Task[]
+  getTasksByCategory: (category: string) => Task[]
+  getChecklistForTask: (taskId: string) => ChecklistItem[]
+  getAssigneesForTask: (taskId: string) => Profile[]
+  getChecklistProgress: (taskId: string) => { completed: number; total: number }
+
+  // --- Mutations (existing) ---
+  updateTaskStatus: (taskId: string, status: TaskStatus) => void
+  updateTaskDescription: (taskId: string, description: string) => void
+  toggleChecklistItem: (itemId: string) => void
+
+  // --- Task CRUD ---
+  addTask: (task: Task) => void
+  updateTask: (taskId: string, updates: Partial<Task>) => void
+  deleteTask: (taskId: string) => void
+
+  // --- Assignee CRUD ---
+  addAssignee: (taskId: string, profileId: string, isPrimary: boolean) => void
+  removeAssignee: (taskId: string, profileId: string) => void
+  togglePrimaryAssignee: (taskId: string, profileId: string) => void
+
+  // --- Checklist CRUD ---
+  addChecklistItem: (item: ChecklistItem) => void
+  updateChecklistItem: (itemId: string, updates: Partial<ChecklistItem>) => void
+  deleteChecklistItem: (itemId: string) => void
+  reorderChecklistItem: (itemId: string, direction: 'up' | 'down') => void
+
+  // --- Comments ---
+  getCommentsForTask: (taskId: string) => TaskComment[]
+  addComment: (comment: TaskComment) => void
+  deleteComment: (commentId: string) => void
+
+  // --- Task Departments ---
+  getTaskDepartments: (taskId: string) => TaskDepartment[]
+  addTaskDepartment: (td: TaskDepartment) => void
+  removeTaskDepartment: (tdId: string) => void
+
+  // --- Profile CRUD (admin) ---
+  addProfile: (profile: Profile) => void
+  updateProfile: (profileId: string, updates: Partial<Profile>) => void
+  deleteProfile: (profileId: string) => void
+
+  // --- Task code helper ---
+  getNextTaskCode: (departmentAbbr: string, periodNumber: number) => string
+}
+
+export const useTaskStore = create<TaskState>((set, get) => ({
+  tasks: MOCK_TASKS,
+  checklists: MOCK_CHECKLISTS,
+  assignees: MOCK_ASSIGNEES,
+  profiles: MOCK_PROFILES,
+  comments: MOCK_COMMENTS,
+  taskDepartments: MOCK_TASK_DEPARTMENTS,
+
+  // ─── Selectors (existing) ───────────────────────────────────────────────────
+
+  getTaskById: (id) => get().tasks.find((t) => t.id === id),
+
+  getTasksByDepartment: (deptId) =>
+    get().tasks.filter((t) => t.departmentId === deptId && t.category === 'department'),
+
+  getTasksByCategory: (category) =>
+    get().tasks.filter((t) => t.category === category),
+
+  getChecklistForTask: (taskId) =>
+    get()
+      .checklists.filter((c) => c.taskId === taskId)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
+
+  getAssigneesForTask: (taskId) => {
+    const assigneeLinks = get().assignees.filter((a) => a.taskId === taskId)
+    const profileIds = assigneeLinks.map((a) => a.profileId)
+    return get().profiles.filter((p) => profileIds.includes(p.id))
+  },
+
+  getChecklistProgress: (taskId) => {
+    const items = get().checklists.filter((c) => c.taskId === taskId)
+    return {
+      completed: items.filter((c) => c.isCompleted).length,
+      total: items.length,
+    }
+  },
+
+  // ─── Mutations (existing) ───────────────────────────────────────────────────
+
+  updateTaskStatus: (taskId, status) =>
+    set((s) => ({
+      tasks: s.tasks.map((t) =>
+        t.id === taskId ? { ...t, status, updatedAt: new Date().toISOString() } : t
+      ),
+    })),
+
+  updateTaskDescription: (taskId, description) =>
+    set((s) => ({
+      tasks: s.tasks.map((t) =>
+        t.id === taskId ? { ...t, description, updatedAt: new Date().toISOString() } : t
+      ),
+    })),
+
+  toggleChecklistItem: (itemId) =>
+    set((s) => ({
+      checklists: s.checklists.map((c) =>
+        c.id === itemId ? { ...c, isCompleted: !c.isCompleted } : c
+      ),
+    })),
+
+  // ─── Task CRUD ──────────────────────────────────────────────────────────────
+
+  addTask: (task) =>
+    set((s) => ({ tasks: [...s.tasks, task] })),
+
+  updateTask: (taskId, updates) =>
+    set((s) => ({
+      tasks: s.tasks.map((t) =>
+        t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
+      ),
+    })),
+
+  deleteTask: (taskId) =>
+    set((s) => ({
+      tasks: s.tasks.filter((t) => t.id !== taskId),
+      checklists: s.checklists.filter((c) => c.taskId !== taskId),
+      assignees: s.assignees.filter((a) => a.taskId !== taskId),
+      comments: s.comments.filter((cm) => cm.taskId !== taskId),
+      taskDepartments: s.taskDepartments.filter((td) => td.taskId !== taskId),
+    })),
+
+  // ─── Assignee CRUD ──────────────────────────────────────────────────────────
+
+  addAssignee: (taskId, profileId, isPrimary) =>
+    set((s) => ({
+      assignees: [
+        ...s.assignees,
+        { id: crypto.randomUUID(), taskId, profileId, isPrimary },
+      ],
+    })),
+
+  removeAssignee: (taskId, profileId) =>
+    set((s) => ({
+      assignees: s.assignees.filter(
+        (a) => !(a.taskId === taskId && a.profileId === profileId)
+      ),
+    })),
+
+  togglePrimaryAssignee: (taskId, profileId) =>
+    set((s) => ({
+      assignees: s.assignees.map((a) =>
+        a.taskId === taskId && a.profileId === profileId
+          ? { ...a, isPrimary: !a.isPrimary }
+          : a
+      ),
+    })),
+
+  // ─── Checklist CRUD ─────────────────────────────────────────────────────────
+
+  addChecklistItem: (item) =>
+    set((s) => ({ checklists: [...s.checklists, item] })),
+
+  updateChecklistItem: (itemId, updates) =>
+    set((s) => ({
+      checklists: s.checklists.map((c) =>
+        c.id === itemId ? { ...c, ...updates } : c
+      ),
+    })),
+
+  deleteChecklistItem: (itemId) =>
+    set((s) => ({ checklists: s.checklists.filter((c) => c.id !== itemId) })),
+
+  reorderChecklistItem: (itemId, direction) =>
+    set((s) => {
+      const item = s.checklists.find((c) => c.id === itemId)
+      if (!item) return s
+
+      // Work only within the same task's checklist, sorted by current sortOrder
+      const taskItems = s.checklists
+        .filter((c) => c.taskId === item.taskId)
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+
+      const idx = taskItems.findIndex((c) => c.id === itemId)
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+
+      if (swapIdx < 0 || swapIdx >= taskItems.length) return s
+
+      const swapItem = taskItems[swapIdx]
+      if (!swapItem) return s
+
+      const newSortOrderForItem = swapItem.sortOrder
+      const newSortOrderForSwap = item.sortOrder
+      const swapItemId = swapItem.id
+
+      return {
+        checklists: s.checklists.map((c) => {
+          if (c.id === itemId) return { ...c, sortOrder: newSortOrderForItem }
+          if (c.id === swapItemId) return { ...c, sortOrder: newSortOrderForSwap }
+          return c
+        }),
+      }
+    }),
+
+  // ─── Comments ───────────────────────────────────────────────────────────────
+
+  getCommentsForTask: (taskId) =>
+    get()
+      .comments.filter((cm) => cm.taskId === taskId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+
+  addComment: (comment) =>
+    set((s) => ({ comments: [...s.comments, comment] })),
+
+  deleteComment: (commentId) =>
+    set((s) => ({ comments: s.comments.filter((cm) => cm.id !== commentId) })),
+
+  // ─── Task Departments ────────────────────────────────────────────────────────
+
+  getTaskDepartments: (taskId) =>
+    get().taskDepartments.filter((td) => td.taskId === taskId),
+
+  addTaskDepartment: (td) =>
+    set((s) => ({ taskDepartments: [...s.taskDepartments, td] })),
+
+  removeTaskDepartment: (tdId) =>
+    set((s) => ({
+      taskDepartments: s.taskDepartments.filter((td) => td.id !== tdId),
+    })),
+
+  // ─── Profile CRUD (admin) ────────────────────────────────────────────────────
+
+  addProfile: (profile) =>
+    set((s) => ({ profiles: [...s.profiles, profile] })),
+
+  updateProfile: (profileId, updates) =>
+    set((s) => ({
+      profiles: s.profiles.map((p) =>
+        p.id === profileId ? { ...p, ...updates } : p
+      ),
+    })),
+
+  deleteProfile: (profileId) =>
+    set((s) => ({
+      profiles: s.profiles.filter((p) => p.id !== profileId),
+      assignees: s.assignees.filter((a) => a.profileId !== profileId),
+    })),
+
+  // ─── Task code helper ────────────────────────────────────────────────────────
+
+  getNextTaskCode: (departmentAbbr, periodNumber) => {
+    const prefix = `${departmentAbbr} ${periodNumber}.`
+    const existing = get()
+      .tasks
+      .filter((t) => t.taskCode.startsWith(prefix))
+      .map((t) => {
+        const seq = parseInt(t.taskCode.slice(prefix.length), 10)
+        return isNaN(seq) ? 0 : seq
+      })
+    const maxSeq = existing.length > 0 ? Math.max(...existing) : 0
+    return `${prefix}${maxSeq + 1}`
+  },
+}))
