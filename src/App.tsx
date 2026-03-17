@@ -9,18 +9,11 @@ import { useUIStore } from '@/stores/uiStore'
 import { CalendarView } from '@/components/calendar/CalendarView'
 import { DashboardView } from '@/components/dashboard/DashboardView'
 import { PrintRequestsView } from '@/components/print/PrintRequestsView'
+import { SettingsView } from '@/components/settings/SettingsView'
 import { InterDepartmentView } from '@/components/departments/InterDepartmentView'
 import { TradeShowHub } from '@/components/departments/TradeShowHub'
 import { CompetitionHub } from '@/components/departments/CompetitionHub'
 
-function PlaceholderView({ title }: { title: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-24 text-text-tertiary">
-      <p className="text-sm font-medium">{title}</p>
-      <p className="mt-1 text-xs">Coming soon.</p>
-    </div>
-  )
-}
 
 function TaskView({ viewOverride }: { viewOverride?: string }) {
   const viewMode = useUIStore((s) => s.viewMode)
@@ -41,7 +34,7 @@ export default function App() {
           <Route path="/competitions" element={<CompetitionHub />} />
           <Route path="/calendar" element={<CalendarView />} />
           <Route path="/print-requests" element={<PrintRequestsView />} />
-          <Route path="/settings" element={<PlaceholderView title="Settings" />} />
+          <Route path="/settings" element={<SettingsView />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <TaskDetail />
