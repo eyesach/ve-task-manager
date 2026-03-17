@@ -22,7 +22,7 @@ const SPECIAL_SECTIONS = [
   { path: '/settings', label: 'Settings', icon: Settings },
 ] as const
 
-export function Sidebar() {
+export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
 
   return (
@@ -64,6 +64,7 @@ export function Sidebar() {
             collapsed={sidebarCollapsed}
             icon={<LayoutDashboard size={16} />}
             label="Dashboard"
+            onNavigate={onNavigate}
           />
         </div>
 
@@ -88,6 +89,7 @@ export function Sidebar() {
                 }
                 label={sidebarCollapsed ? dept.abbreviation : dept.name}
                 badge={dept.abbreviation}
+                onNavigate={onNavigate}
               />
             ))}
           </div>
@@ -105,6 +107,7 @@ export function Sidebar() {
               collapsed={sidebarCollapsed}
               icon={<Icon size={16} />}
               label={label}
+              onNavigate={onNavigate}
             />
           ))}
         </div>
@@ -135,6 +138,7 @@ function NavButton({
   icon,
   label,
   badge,
+  onNavigate,
 }: {
   to: string
   end?: boolean
@@ -142,12 +146,14 @@ function NavButton({
   icon: React.ReactNode
   label: string
   badge?: string
+  onNavigate?: () => void
 }) {
   return (
     <NavLink
       to={to}
       end={end}
       title={collapsed ? label : undefined}
+      onClick={onNavigate}
       className={({ isActive }) => `
         group flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm transition-all
         ${collapsed ? 'justify-center' : ''}

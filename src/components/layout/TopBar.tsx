@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Search, List, LayoutGrid, Plus, Table2 } from 'lucide-react'
+import { Search, List, LayoutGrid, Plus, Table2, Menu } from 'lucide-react'
 import { useLocation, useParams } from 'react-router-dom'
 import { useUIStore } from '@/stores/uiStore'
 import { useFilterStore } from '@/stores/filterStore'
@@ -8,6 +8,8 @@ import { usePeriodStore } from '@/stores/periodStore'
 import { DEPARTMENTS, TASK_STATUSES, TASK_PRIORITIES } from '@/lib/constants'
 import type { TaskStatus, TaskPriority } from '@/lib/types'
 import { TaskCreateModal } from '@/components/tasks/TaskCreateModal'
+import { ShortcutsOverlay } from '@/components/common/ShortcutsOverlay'
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 function useViewTitle(): { title: string; subtitle?: string; color?: string } {
   const { pathname } = useLocation()
@@ -30,7 +32,7 @@ function useViewTitle(): { title: string; subtitle?: string; color?: string } {
   return { title: routeTitles[pathname] ?? 'Tasks' }
 }
 
-export function TopBar() {
+export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const { viewMode, setViewMode } = useUIStore()
   const {
     statusFilter,
@@ -46,12 +48,27 @@ export function TopBar() {
   const { periods, activePeriodId, setActivePeriod } = usePeriodStore()
   const { title, subtitle, color } = useViewTitle()
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+
+  useKeyboardShortcuts({
+    onHelp: () => setShowShortcuts(true),
+    onNewTask: () => setShowCreateModal(true),
+  })
 
   return (
     <>
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle bg-surface-1 px-6">
-      {/* Left: View title */}
+      {/* Left: hamburger (mobile) + View title */}
       <div className="flex items-center gap-3">
+        {onMenuToggle && (
+          <button
+            onClick={onMenuToggle}
+            className="mr-2 flex h-8 w-8 items-center justify-center rounded-lg text-text-secondary hover:bg-surface-3 md:hidden"
+            aria-label="Open menu"
+          >
+            <Menu size={18} />
+          </button>
+        )}
         {color && (
           <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
         )}
@@ -183,6 +200,7 @@ export function TopBar() {
       </div>
     </header>
     <TaskCreateModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
+    <ShortcutsOverlay open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </>
   )
 }

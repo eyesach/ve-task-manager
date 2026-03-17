@@ -178,7 +178,7 @@ export function TaskDetail() {
       <div
         ref={panelRef}
         className={`
-          fixed right-0 top-0 z-50 flex h-screen w-[520px] flex-col border-l
+          fixed right-0 top-0 z-50 flex h-screen w-full md:w-[520px] flex-col border-l
           border-border-subtle bg-surface-1 shadow-2xl transition-transform
           duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
           ${selectedTaskId ? 'translate-x-0' : 'translate-x-full'}
