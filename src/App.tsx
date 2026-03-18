@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider } from '@/components/auth/AuthProvider'
+import { LoginPage } from '@/components/auth/LoginPage'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { AppShell } from '@/components/layout/AppShell'
 import { TaskList } from '@/components/tasks/TaskList'
 import { TaskBoard } from '@/components/tasks/TaskBoard'
@@ -40,22 +43,34 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <AppShell>
+      <AuthProvider>
         <Routes>
-          <Route path="/" element={<DashboardView />} />
-          <Route path="/department/:abbr" element={<TaskView />} />
-          <Route path="/inter-department" element={<InterDepartmentView />} />
-          <Route path="/trade-shows" element={<TradeShowHub />} />
-          <Route path="/competitions" element={<CompetitionHub />} />
-          <Route path="/calendar" element={<CalendarView />} />
-          <Route path="/print-requests" element={<PrintRequestsView />} />
-          <Route path="/settings" element={<SettingsView />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="*"
+            element={
+              <ProtectedRoute>
+                <AppShell>
+                  <Routes>
+                    <Route path="/" element={<DashboardView />} />
+                    <Route path="/department/:abbr" element={<TaskView />} />
+                    <Route path="/inter-department" element={<InterDepartmentView />} />
+                    <Route path="/trade-shows" element={<TradeShowHub />} />
+                    <Route path="/competitions" element={<CompetitionHub />} />
+                    <Route path="/calendar" element={<CalendarView />} />
+                    <Route path="/print-requests" element={<PrintRequestsView />} />
+                    <Route path="/settings" element={<SettingsView />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                  <TaskDetail />
+                  <ToastContainer />
+                  <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+                </AppShell>
+              </ProtectedRoute>
+            }
+          />
         </Routes>
-        <TaskDetail />
-        <ToastContainer />
-        <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
-      </AppShell>
+      </AuthProvider>
     </BrowserRouter>
   )
 }
