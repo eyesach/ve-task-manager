@@ -3,7 +3,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { MessageSquare, Trash2 } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { Avatar } from '@/components/common/AvatarGroup'
-import { CURRENT_USER_ID } from '@/lib/constants'
+import { useAuth } from '@/components/auth/AuthProvider'
 
 interface TaskCommentsProps {
   taskId: string
@@ -11,6 +11,8 @@ interface TaskCommentsProps {
 
 export function TaskComments({ taskId }: TaskCommentsProps) {
   const { getCommentsForTask, addComment, deleteComment, profiles } = useTaskStore()
+  const { profile: authProfile } = useAuth()
+  const currentUserId = authProfile?.id ?? ''
   const [draft, setDraft] = useState('')
 
   const comments = getCommentsForTask(taskId)
@@ -22,7 +24,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
     addComment({
       id: crypto.randomUUID(),
       taskId,
-      profileId: CURRENT_USER_ID,
+      profileId: currentUserId,
       content: text,
       createdAt: new Date().toISOString(),
     })
@@ -51,7 +53,7 @@ export function TaskComments({ taskId }: TaskCommentsProps) {
         <div className="mb-4 space-y-4">
           {comments.map((comment) => {
             const profile = profiles.find((p) => p.id === comment.profileId)
-            const isOwn = comment.profileId === CURRENT_USER_ID
+            const isOwn = comment.profileId === currentUserId
             return (
               <div key={comment.id} className="flex gap-2.5">
                 {profile && <Avatar profile={profile} size="sm" />}

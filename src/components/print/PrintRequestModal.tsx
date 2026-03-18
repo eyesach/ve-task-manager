@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { usePrintStore } from '@/stores/printStore'
 import { useToastStore } from '@/stores/toastStore'
-import { DEPARTMENTS, PRINT_PAPER_TYPES, CURRENT_USER_ID } from '@/lib/constants'
+import { COMPANY_ID } from '@/lib/ids'
+import { DEPARTMENTS, PRINT_PAPER_TYPES } from '@/lib/constants'
+import { useAuth } from '@/components/auth/AuthProvider'
 import type { PrintRequest } from '@/lib/types'
 
 interface PrintRequestModalProps {
@@ -13,6 +15,7 @@ interface PrintRequestModalProps {
 export function PrintRequestModal({ open, onClose }: PrintRequestModalProps) {
   const { addRequest } = usePrintStore()
   const { addToast } = useToastStore()
+  const { profile } = useAuth()
 
   const [itemName, setItemName] = useState('')
   const [linkToPdf, setLinkToPdf] = useState('')
@@ -40,10 +43,10 @@ export function PrintRequestModal({ open, onClose }: PrintRequestModalProps) {
 
     const request: PrintRequest = {
       id: crypto.randomUUID(),
-      companyId: 'siply',
+      companyId: COMPANY_ID,
       itemName: itemName.trim(),
       linkToPdf: linkToPdf.trim() || undefined,
-      requestedBy: CURRENT_USER_ID,
+      requestedBy: profile?.id ?? '',
       departmentId,
       quantity,
       sided,

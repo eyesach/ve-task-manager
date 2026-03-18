@@ -8,10 +8,12 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeft,
+  LogOut,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { DEPARTMENTS } from '@/lib/constants'
 import { useUIStore } from '@/stores/uiStore'
+import { useAuth } from '@/components/auth/AuthProvider'
 
 const SPECIAL_SECTIONS = [
   { path: '/inter-department', label: 'Inter-Department', icon: ArrowLeftRight },
@@ -24,6 +26,13 @@ const SPECIAL_SECTIONS = [
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
+  const { profile, signOut } = useAuth()
+
+  const isTeacherOrAdmin = profile?.role === 'teacher' || profile?.role === 'admin'
+
+  const visibleSpecialSections = SPECIAL_SECTIONS.filter(
+    (section) => section.path !== '/settings' || isTeacherOrAdmin
+  )
 
   return (
     <aside
@@ -100,7 +109,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
         {/* Special sections */}
         <div className="px-2">
-          {SPECIAL_SECTIONS.map(({ path, label, icon: Icon }) => (
+          {visibleSpecialSections.map(({ path, label, icon: Icon }) => (
             <NavButton
               key={path}
               to={path}
@@ -113,20 +122,42 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </div>
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-border-subtle p-3">
-        {!sidebarCollapsed && (
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-4 text-xs font-medium text-text-secondary">
-              MT
+      {/* Footer — Logged-in User */}
+      {profile && (
+        <div className="border-t border-border-subtle p-3">
+          {!sidebarCollapsed ? (
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-4 text-xs font-medium text-text-secondary">
+                {profile.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-text-primary">{profile.fullName}</p>
+                <p className="truncate text-[10px] text-text-tertiary capitalize">{profile.role.replace('_', ' ')}</p>
+              </div>
+              <button
+                onClick={() => signOut()}
+                title="Sign out"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-surface-3 hover:text-text-secondary"
+              >
+                <LogOut size={14} />
+              </button>
             </div>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-text-primary">Ms. Thompson</p>
-              <p className="truncate text-[10px] text-text-tertiary">Teacher Advisor</p>
+          ) : (
+            <div className="flex flex-col items-center gap-2" title={profile.fullName}>
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-surface-4 text-xs font-medium text-text-secondary">
+                {profile.fullName.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+              <button
+                onClick={() => signOut()}
+                title="Sign out"
+                className="flex h-5 w-5 items-center justify-center rounded text-text-tertiary transition-colors hover:bg-surface-3 hover:text-text-secondary"
+              >
+                <LogOut size={12} />
+              </button>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </aside>
   )
 }
