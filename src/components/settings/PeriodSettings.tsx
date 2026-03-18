@@ -3,6 +3,8 @@ import { Pencil, Trash2, Plus, Check, X, Radio } from 'lucide-react'
 import { usePeriodStore } from '@/stores/periodStore'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useToastStore } from '@/stores/toastStore'
+import { usePermissions } from '@/hooks/usePermissions'
+import { COMPANY_ID } from '@/lib/ids'
 import type { TaskPeriod } from '@/lib/types'
 
 interface PeriodEditState {
@@ -25,6 +27,7 @@ export function PeriodSettings() {
   const updatePeriod = usePeriodStore((s) => s.updatePeriod)
   const deletePeriod = usePeriodStore((s) => s.deletePeriod)
   const addToast = useToastStore((s) => s.addToast)
+  const { canManageSettings } = usePermissions()
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editState, setEditState] = useState<PeriodEditState>(emptyPeriod())
@@ -60,7 +63,7 @@ export function PeriodSettings() {
     }
     const period: TaskPeriod = {
       id: crypto.randomUUID(),
-      companyId: 'siply',
+      companyId: COMPANY_ID,
       name: newPeriod.name.trim(),
       startDate: newPeriod.startDate,
       endDate: newPeriod.endDate,
@@ -82,13 +85,15 @@ export function PeriodSettings() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-text-secondary">{periods.length} periods</p>
-        <button
-          onClick={() => { setShowAddForm(true); setNewPeriod(emptyPeriod()) }}
-          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover"
-        >
-          <Plus className="h-4 w-4" />
-          Add Period
-        </button>
+        {canManageSettings && (
+          <button
+            onClick={() => { setShowAddForm(true); setNewPeriod(emptyPeriod()) }}
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover"
+          >
+            <Plus className="h-4 w-4" />
+            Add Period
+          </button>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border-subtle bg-surface-1">
@@ -161,13 +166,17 @@ export function PeriodSettings() {
               ) : (
                 <tr key={period.id} className={`hover:bg-surface-2 ${activePeriodId === period.id ? 'bg-surface-2' : ''}`}>
                   <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => handleSetActive(period.id)}
-                      className={`rounded-full p-0.5 transition-colors ${activePeriodId === period.id ? 'text-accent' : 'text-text-tertiary hover:text-accent'}`}
-                      title={activePeriodId === period.id ? 'Active period' : 'Set as active period'}
-                    >
-                      <Radio className="h-4 w-4" fill={activePeriodId === period.id ? 'currentColor' : 'none'} />
-                    </button>
+                    {canManageSettings ? (
+                      <button
+                        onClick={() => handleSetActive(period.id)}
+                        className={`rounded-full p-0.5 transition-colors ${activePeriodId === period.id ? 'text-accent' : 'text-text-tertiary hover:text-accent'}`}
+                        title={activePeriodId === period.id ? 'Active period' : 'Set as active period'}
+                      >
+                        <Radio className="h-4 w-4" fill={activePeriodId === period.id ? 'currentColor' : 'none'} />
+                      </button>
+                    ) : (
+                      <Radio className={`mx-auto h-4 w-4 ${activePeriodId === period.id ? 'text-accent' : 'text-text-tertiary'}`} fill={activePeriodId === period.id ? 'currentColor' : 'none'} />
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className="font-medium text-text-primary">{period.name}</span>
@@ -180,23 +189,25 @@ export function PeriodSettings() {
                   <td className="px-4 py-3 text-text-secondary">{period.startDate || '—'}</td>
                   <td className="px-4 py-3 text-text-secondary">{period.endDate || '—'}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => startEdit(period)}
-                        className="rounded p-1 text-text-tertiary hover:bg-surface-3 hover:text-text-primary"
-                        title="Edit"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(period)}
-                        className="rounded p-1 text-text-tertiary hover:bg-surface-3 hover:text-red-500"
-                        title="Delete"
-                        disabled={activePeriodId === period.id}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    {canManageSettings && (
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => startEdit(period)}
+                          className="rounded p-1 text-text-tertiary hover:bg-surface-3 hover:text-text-primary"
+                          title="Edit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(period)}
+                          className="rounded p-1 text-text-tertiary hover:bg-surface-3 hover:text-red-500"
+                          title="Delete"
+                          disabled={activePeriodId === period.id}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               )

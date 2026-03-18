@@ -17,6 +17,7 @@ import { useTaskStore } from '@/stores/taskStore'
 import { useUIStore } from '@/stores/uiStore'
 import { getDepartmentById, EVENT_TYPES } from '@/lib/constants'
 import { EventCreateModal } from '@/components/calendar/EventCreateModal'
+import { usePermissions } from '@/hooks/usePermissions'
 import type { CalendarEvent } from '@/lib/types'
 import type { Task } from '@/lib/types'
 
@@ -36,6 +37,7 @@ export function CalendarView() {
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
 
+  const { canCreateCalendarEvent } = usePermissions()
   const getEventsForDate = useCalendarStore((s) => s.getEventsForDate)
   const allTasks = useTaskStore((s) => s.tasks)
   const openTaskDetail = useUIStore((s) => s.openTaskDetail)
@@ -94,13 +96,15 @@ export function CalendarView() {
           >
             Today
           </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Add Event
-          </button>
+          {canCreateCalendarEvent && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Event
+            </button>
+          )}
         </div>
       </div>
 
@@ -299,13 +303,15 @@ export function CalendarView() {
               </section>
             )}
 
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border-subtle py-2 text-xs text-text-tertiary hover:border-border-strong hover:text-text-secondary"
-            >
-              <Plus className="h-3 w-3" />
-              Add event on this day
-            </button>
+            {canCreateCalendarEvent && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border-subtle py-2 text-xs text-text-tertiary hover:border-border-strong hover:text-text-secondary"
+              >
+                <Plus className="h-3 w-3" />
+                Add event on this day
+              </button>
+            )}
           </aside>
         )}
       </div>

@@ -30,6 +30,7 @@ import { TaskComments } from './TaskComments'
 import { RichTextEditor, RichTextViewer } from '@/components/common/RichTextEditor'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { AssigneeSelect } from './AssigneeSelect'
+import { usePermissions } from '@/hooks/usePermissions'
 
 export function TaskDetail() {
   const { selectedTaskId, closeTaskDetail } = useUIStore()
@@ -68,6 +69,21 @@ export function TaskDetail() {
   const task = selectedTaskId ? getTaskById(selectedTaskId) : undefined
   const assignees = selectedTaskId ? getAssigneesForTask(selectedTaskId) : []
   const dept = task?.departmentId ? getDepartmentById(task.departmentId) : null
+
+  // Permissions
+  const {
+    canEditTask,
+    canDeleteTask,
+    canUpdateTaskStatus,
+    canUpdateChecklist,
+    canAssignMembers,
+  } = usePermissions()
+  const assigneeIds = assignees.map((a) => a.id)
+  const canEdit = task ? canEditTask(task) : false
+  const canDelete = task ? canDeleteTask(task) : false
+  const canChangeStatus = task ? canUpdateTaskStatus(task, assigneeIds) : false
+  const canChangeChecklist = task ? canUpdateChecklist(task, assigneeIds) : false
+  const canAssign = task ? canAssignMembers(task.departmentId ?? undefined) : false
 
   // Sync local edit state from task when editing mode starts or task changes
   useEffect(() => {
@@ -221,19 +237,21 @@ export function TaskDetail() {
 
               {/* Header action buttons */}
               <div className="flex shrink-0 items-center gap-1">
-                {/* Edit toggle */}
-                <button
-                  onClick={() => setEditing(!editing)}
-                  title={editing ? 'View mode' : 'Edit task'}
-                  className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-surface-3 ${
-                    editing ? 'text-accent' : 'text-text-tertiary hover:text-text-primary'
-                  }`}
-                >
-                  {editing ? <Eye size={15} /> : <Pencil size={15} />}
-                </button>
+                {/* Edit toggle — only for users who can edit */}
+                {canEdit && (
+                  <button
+                    onClick={() => setEditing(!editing)}
+                    title={editing ? 'View mode' : 'Edit task'}
+                    className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-surface-3 ${
+                      editing ? 'text-accent' : 'text-text-tertiary hover:text-text-primary'
+                    }`}
+                  >
+                    {editing ? <Eye size={15} /> : <Pencil size={15} />}
+                  </button>
+                )}
 
-                {/* Carry Over button — only for non-completed tasks */}
-                {task.status !== 'completed' && (
+                {/* Carry Over button — only for non-completed tasks, only editors */}
+                {canEdit && task.status !== 'completed' && (
                   <button
                     onClick={handleCarryOver}
                     title="Carry over to next period"
@@ -243,14 +261,16 @@ export function TaskDetail() {
                   </button>
                 )}
 
-                {/* Delete button */}
-                <button
-                  onClick={() => setShowDeleteConfirm(true)}
-                  title="Delete task"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
-                >
-                  <Trash2 size={15} />
-                </button>
+                {/* Delete button — only for users who can delete */}
+                {canDelete && (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    title="Delete task"
+                    className="flex h-8 w-8 items-center justify-center rounded-md text-text-tertiary transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
 
                 {/* Close */}
                 <button
@@ -273,7 +293,7 @@ export function TaskDetail() {
                   </label>
                   <StatusChip
                     status={task.status}
-                    editable
+                    editable={canChangeStatus}
                     onChange={(s) => updateTaskStatus(task.id, s)}
                   />
                 </div>
@@ -344,24 +364,30 @@ export function TaskDetail() {
                   )}
                 </div>
 
-                {/* Priority (always editable via select) */}
+                {/* Priority */}
                 <div>
                   <label className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-text-tertiary">
                     <Flag size={10} /> Priority
                   </label>
-                  <select
-                    value={task.priority}
-                    onChange={(e) =>
-                      updateTask(task.id, { priority: e.target.value as TaskPriority })
-                    }
-                    className={selectCls}
-                  >
-                    {TASK_PRIORITIES.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
+                  {canEdit ? (
+                    <select
+                      value={task.priority}
+                      onChange={(e) =>
+                        updateTask(task.id, { priority: e.target.value as TaskPriority })
+                      }
+                      className={selectCls}
+                    >
+                      {TASK_PRIORITIES.map((p) => (
+                        <option key={p.value} value={p.value}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-sm capitalize text-text-primary">
+                      {task.priority}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -371,16 +397,18 @@ export function TaskDetail() {
                   <label className="text-[10px] font-medium uppercase tracking-wider text-text-tertiary">
                     Description
                   </label>
-                  <button
-                    onClick={() => setEditingDescription(!editingDescription)}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-text-tertiary transition-colors hover:bg-surface-3 hover:text-text-primary"
-                    title={editingDescription ? 'View mode' : 'Edit description'}
-                  >
-                    {editingDescription ? <Eye size={10} /> : <Pencil size={10} />}
-                    {editingDescription ? 'View' : 'Edit'}
-                  </button>
+                  {canEdit && (
+                    <button
+                      onClick={() => setEditingDescription(!editingDescription)}
+                      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-text-tertiary transition-colors hover:bg-surface-3 hover:text-text-primary"
+                      title={editingDescription ? 'View mode' : 'Edit description'}
+                    >
+                      {editingDescription ? <Eye size={10} /> : <Pencil size={10} />}
+                      {editingDescription ? 'View' : 'Edit'}
+                    </button>
+                  )}
                 </div>
-                {editingDescription ? (
+                {editingDescription && canEdit ? (
                   <RichTextEditor
                     content={task.description ?? ''}
                     onChange={(html) => updateTaskDescription(task.id, html)}
@@ -388,13 +416,15 @@ export function TaskDetail() {
                   />
                 ) : task.description ? (
                   <RichTextViewer content={task.description} />
-                ) : (
+                ) : canEdit ? (
                   <p
                     className="cursor-pointer text-sm italic text-text-tertiary hover:text-text-secondary"
                     onClick={() => setEditingDescription(true)}
                   >
                     Click to add a description...
                   </p>
+                ) : (
+                  <p className="text-sm italic text-text-tertiary">No description</p>
                 )}
               </div>
 
@@ -437,33 +467,37 @@ export function TaskDetail() {
                           <Avatar profile={p} size="sm" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-text-primary">{p.fullName}</p>
-                            <p className="text-[11px] text-text-tertiary capitalize">
-                              {p.role.replace('_', ' ')}
+                            <p className="text-[11px] text-text-tertiary">
+                              {p.jobTitle ?? p.role.replace('_', ' ')}
                             </p>
                           </div>
                           {/* Star for primary */}
-                          <button
-                            onClick={() => togglePrimaryAssignee(task.id, p.id)}
-                            title={link?.isPrimary ? 'Remove primary' : 'Set as primary'}
-                            className={`flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-surface-3 ${
-                              link?.isPrimary
-                                ? 'text-amber-400'
-                                : 'text-text-tertiary hover:text-amber-400'
-                            }`}
-                          >
-                            <Star
-                              size={13}
-                              fill={link?.isPrimary ? 'currentColor' : 'none'}
-                            />
-                          </button>
+                          {canAssign && (
+                            <button
+                              onClick={() => togglePrimaryAssignee(task.id, p.id)}
+                              title={link?.isPrimary ? 'Remove primary' : 'Set as primary'}
+                              className={`flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-surface-3 ${
+                                link?.isPrimary
+                                  ? 'text-amber-400'
+                                  : 'text-text-tertiary hover:text-amber-400'
+                              }`}
+                            >
+                              <Star
+                                size={13}
+                                fill={link?.isPrimary ? 'currentColor' : 'none'}
+                              />
+                            </button>
+                          )}
                           {/* Remove */}
-                          <button
-                            onClick={() => removeAssignee(task.id, p.id)}
-                            title="Remove assignee"
-                            className="flex h-6 w-6 items-center justify-center rounded text-text-tertiary transition-colors hover:bg-surface-3 hover:text-red-500"
-                          >
-                            <X size={13} />
-                          </button>
+                          {canAssign && (
+                            <button
+                              onClick={() => removeAssignee(task.id, p.id)}
+                              title="Remove assignee"
+                              className="flex h-6 w-6 items-center justify-center rounded text-text-tertiary transition-colors hover:bg-surface-3 hover:text-red-500"
+                            >
+                              <X size={13} />
+                            </button>
+                          )}
                         </div>
                       )
                     })}
@@ -471,16 +505,18 @@ export function TaskDetail() {
                 ) : (
                   <p className="mb-3 text-sm text-text-tertiary">No assignees</p>
                 )}
-                <AssigneeSelect
-                  selectedIds={assignees.map((p) => p.id)}
-                  onAdd={(profileId) => addAssignee(task.id, profileId, assignees.length === 0)}
-                  onRemove={(profileId) => removeAssignee(task.id, profileId)}
-                />
+                {canAssign && (
+                  <AssigneeSelect
+                    selectedIds={assignees.map((p) => p.id)}
+                    onAdd={(profileId) => addAssignee(task.id, profileId, assignees.length === 0)}
+                    onRemove={(profileId) => removeAssignee(task.id, profileId)}
+                  />
+                )}
               </div>
 
               {/* Checklist */}
               <div className="p-5">
-                <TaskChecklist taskId={task.id} />
+                <TaskChecklist taskId={task.id} readOnly={!canChangeChecklist} />
               </div>
 
               {/* Comments */}

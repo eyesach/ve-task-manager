@@ -6,11 +6,13 @@ import { useTaskStore } from '@/stores/taskStore'
 import { getDepartmentById, PRINT_STATUSES } from '@/lib/constants'
 import { PrintRequestModal } from './PrintRequestModal'
 import { EmptyState } from '@/components/common/EmptyState'
+import { usePermissions } from '@/hooks/usePermissions'
 import type { PrintRequest } from '@/lib/types'
 
 export function PrintRequestsView() {
   const { requests, updateRequest, deleteRequest } = usePrintStore()
   const { profiles } = useTaskStore()
+  const { isTeacherOrAdmin } = usePermissions()
   const [modalOpen, setModalOpen] = useState(false)
 
   function getProfileName(profileId: string) {
@@ -149,23 +151,29 @@ export function PrintRequestsView() {
                         {req.paperType}
                       </td>
 
-                      {/* Status — editable dropdown */}
+                      {/* Status — editable dropdown (teacher/admin only) */}
                       <td className="px-4 py-3">
-                        <select
-                          value={req.status}
-                          onChange={(e) =>
-                            updateRequest(req.id, {
-                              status: e.target.value as PrintRequest['status'],
-                            })
-                          }
-                          className="rounded-lg border border-border-subtle bg-surface-1 px-2 py-1 text-xs text-text-primary outline-none focus:border-border-strong cursor-pointer hover:bg-surface-3"
-                        >
-                          {PRINT_STATUSES.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
+                        {isTeacherOrAdmin ? (
+                          <select
+                            value={req.status}
+                            onChange={(e) =>
+                              updateRequest(req.id, {
+                                status: e.target.value as PrintRequest['status'],
+                              })
+                            }
+                            className="rounded-lg border border-border-subtle bg-surface-1 px-2 py-1 text-xs text-text-primary outline-none focus:border-border-strong cursor-pointer hover:bg-surface-3"
+                          >
+                            {PRINT_STATUSES.map((s) => (
+                              <option key={s.value} value={s.value}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="rounded-lg border border-border-subtle bg-surface-1 px-2 py-1 text-xs text-text-primary">
+                            {PRINT_STATUSES.find((s) => s.value === req.status)?.label ?? req.status}
+                          </span>
+                        )}
                       </td>
 
                       {/* Date */}
@@ -175,13 +183,15 @@ export function PrintRequestsView() {
 
                       {/* Actions */}
                       <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => deleteRequest(req.id)}
-                          className="invisible group-hover:visible flex items-center justify-center ml-auto h-7 w-7 rounded-md text-text-tertiary hover:bg-red-500/10 hover:text-red-400 transition-colors"
-                          title="Delete request"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        {isTeacherOrAdmin && (
+                          <button
+                            onClick={() => deleteRequest(req.id)}
+                            className="invisible group-hover:visible flex items-center justify-center ml-auto h-7 w-7 rounded-md text-text-tertiary hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                            title="Delete request"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   )

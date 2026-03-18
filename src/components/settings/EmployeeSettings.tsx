@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Pencil, Trash2, Plus, Check, X } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
-import { DEPARTMENTS } from '@/lib/constants'
+import { DEPARTMENTS, getLeadTitleForDepartment, getMemberTitlesForDepartment } from '@/lib/constants'
+import { COMPANY_ID } from '@/lib/ids'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useToastStore } from '@/stores/toastStore'
+import { usePermissions } from '@/hooks/usePermissions'
 import type { Profile } from '@/lib/types'
 
 const ROLES: { value: Profile['role']; label: string }[] = [
@@ -16,8 +18,10 @@ const ROLES: { value: Profile['role']; label: string }[] = [
 interface EditState {
   fullName: string
   email: string
-  departmentId: string
+  departmentId: string | null
   role: Profile['role']
+  jobTitle: string
+  customTitle: string
 }
 
 const emptyEdit = (): EditState => ({
@@ -25,7 +29,19 @@ const emptyEdit = (): EditState => ({
   email: '',
   departmentId: DEPARTMENTS[0].id,
   role: 'member',
+  jobTitle: '',
+  customTitle: '',
 })
+
+function getJobTitleOptions(role: Profile['role'], departmentId: string | null): string[] {
+  if (role === 'department_lead') {
+    return [getLeadTitleForDepartment(departmentId)]
+  }
+  if (role === 'member') {
+    return getMemberTitlesForDepartment(departmentId)
+  }
+  return []
+}
 
 export function EmployeeSettings() {
   const profiles = useTaskStore((s) => s.profiles)
@@ -33,6 +49,7 @@ export function EmployeeSettings() {
   const updateProfile = useTaskStore((s) => s.updateProfile)
   const deleteProfile = useTaskStore((s) => s.deleteProfile)
   const addToast = useToastStore((s) => s.addToast)
+  const { canManageEmployees } = usePermissions()
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editState, setEditState] = useState<EditState>(emptyEdit())
@@ -42,12 +59,22 @@ export function EmployeeSettings() {
 
   function startEdit(profile: Profile) {
     setEditingId(profile.id)
+    const options = getJobTitleOptions(profile.role, profile.departmentId)
+    const isCustom = profile.jobTitle ? !options.includes(profile.jobTitle) : false
     setEditState({
       fullName: profile.fullName,
       email: profile.email,
       departmentId: profile.departmentId,
       role: profile.role,
+      jobTitle: isCustom ? '__custom__' : (profile.jobTitle ?? ''),
+      customTitle: isCustom ? (profile.jobTitle ?? '') : '',
     })
+  }
+
+  function resolveJobTitle(state: EditState): string | undefined {
+    if (state.role === 'teacher' || state.role === 'admin') return undefined
+    if (state.jobTitle === '__custom__') return state.customTitle.trim() || undefined
+    return state.jobTitle || undefined
   }
 
   function saveEdit(profileId: string) {
@@ -58,8 +85,9 @@ export function EmployeeSettings() {
     updateProfile(profileId, {
       fullName: editState.fullName.trim(),
       email: editState.email.trim(),
-      departmentId: editState.departmentId,
+      departmentId: editState.role === 'teacher' ? null : editState.departmentId,
       role: editState.role,
+      jobTitle: resolveJobTitle(editState),
     })
     setEditingId(null)
     addToast('success', 'Employee updated.')
@@ -77,11 +105,12 @@ export function EmployeeSettings() {
     }
     const profile: Profile = {
       id: crypto.randomUUID(),
-      companyId: 'siply',
-      departmentId: newEmployee.departmentId,
+      companyId: COMPANY_ID,
+      departmentId: newEmployee.role === 'teacher' ? null : newEmployee.departmentId,
       fullName: newEmployee.fullName.trim(),
       email: newEmployee.email.trim(),
       role: newEmployee.role,
+      jobTitle: resolveJobTitle(newEmployee),
     }
     addProfile(profile)
     setNewEmployee(emptyEdit())
@@ -89,7 +118,8 @@ export function EmployeeSettings() {
     addToast('success', `${profile.fullName} added.`)
   }
 
-  function getDeptName(deptId: string) {
+  function getDeptName(deptId: string | null) {
+    if (!deptId) return '—'
     return DEPARTMENTS.find((d) => d.id === deptId)?.abbreviation ?? '—'
   }
 
@@ -97,17 +127,25 @@ export function EmployeeSettings() {
     return ROLES.find((r) => r.value === role)?.label ?? role
   }
 
+  function getDisplayTitle(profile: Profile) {
+    if (profile.jobTitle) return profile.jobTitle
+    if (profile.role === 'department_lead') return getLeadTitleForDepartment(profile.departmentId)
+    return getRoleLabel(profile.role)
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-text-secondary">{profiles.length} employees</p>
-        <button
-          onClick={() => { setShowAddForm(true); setNewEmployee(emptyEdit()) }}
-          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover"
-        >
-          <Plus className="h-4 w-4" />
-          Add Employee
-        </button>
+        {canManageEmployees && (
+          <button
+            onClick={() => { setShowAddForm(true); setNewEmployee(emptyEdit()) }}
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover"
+          >
+            <Plus className="h-4 w-4" />
+            Add Employee
+          </button>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border-subtle bg-surface-1">
@@ -118,6 +156,7 @@ export function EmployeeSettings() {
               <th className="px-4 py-2.5 text-left font-medium text-text-secondary">Email</th>
               <th className="px-4 py-2.5 text-left font-medium text-text-secondary">Dept</th>
               <th className="px-4 py-2.5 text-left font-medium text-text-secondary">Role</th>
+              <th className="px-4 py-2.5 text-left font-medium text-text-secondary">Title</th>
               <th className="px-4 py-2.5 text-right font-medium text-text-secondary">Actions</th>
             </tr>
           </thead>
@@ -141,26 +180,99 @@ export function EmployeeSettings() {
                     />
                   </td>
                   <td className="px-4 py-2">
-                    <select
-                      className="rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
-                      value={editState.departmentId}
-                      onChange={(e) => setEditState((s) => ({ ...s, departmentId: e.target.value }))}
-                    >
-                      {DEPARTMENTS.map((d) => (
-                        <option key={d.id} value={d.id}>{d.abbreviation}</option>
-                      ))}
-                    </select>
+                    {editState.role === 'teacher' ? (
+                      <span className="inline-flex items-center rounded px-2 py-1 text-xs text-text-tertiary bg-surface-3">N/A</span>
+                    ) : (
+                      <select
+                        className="rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                        value={editState.departmentId ?? ''}
+                        onChange={(e) => {
+                          const deptId = e.target.value
+                          const options = getJobTitleOptions(editState.role, deptId)
+                          setEditState((s) => ({
+                            ...s,
+                            departmentId: deptId,
+                            jobTitle: options[0] ?? '',
+                            customTitle: '',
+                          }))
+                        }}
+                      >
+                        {DEPARTMENTS.map((d) => (
+                          <option key={d.id} value={d.id}>{d.abbreviation}</option>
+                        ))}
+                      </select>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     <select
                       className="rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
                       value={editState.role}
-                      onChange={(e) => setEditState((s) => ({ ...s, role: e.target.value as Profile['role'] }))}
+                      onChange={(e) => {
+                        const role = e.target.value as Profile['role']
+                        const deptId = role === 'teacher' ? null : (editState.departmentId ?? DEPARTMENTS[0].id)
+                        const options = getJobTitleOptions(role, deptId)
+                        setEditState((s) => ({
+                          ...s,
+                          role,
+                          departmentId: deptId,
+                          jobTitle: options[0] ?? '',
+                          customTitle: '',
+                        }))
+                      }}
                     >
                       {ROLES.map((r) => (
                         <option key={r.value} value={r.value}>{r.label}</option>
                       ))}
                     </select>
+                  </td>
+                  <td className="px-4 py-2">
+                    {editState.role === 'teacher' || editState.role === 'admin' ? (
+                      <span className="inline-flex items-center rounded px-2 py-1 text-xs text-text-tertiary bg-surface-3">—</span>
+                    ) : editState.role === 'department_lead' ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm text-text-primary">{getLeadTitleForDepartment(editState.departmentId)}</span>
+                        {editState.jobTitle === '__custom__' ? (
+                          <input
+                            className="w-full rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+                            placeholder="Custom title"
+                            value={editState.customTitle}
+                            onChange={(e) => setEditState((s) => ({ ...s, customTitle: e.target.value }))}
+                          />
+                        ) : null}
+                        <button
+                          type="button"
+                          className="text-xs text-accent hover:underline text-left"
+                          onClick={() => setEditState((s) => ({
+                            ...s,
+                            jobTitle: s.jobTitle === '__custom__' ? getLeadTitleForDepartment(s.departmentId) : '__custom__',
+                            customTitle: '',
+                          }))}
+                        >
+                          {editState.jobTitle === '__custom__' ? 'Use default' : 'Custom title'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1">
+                        <select
+                          className="rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                          value={editState.jobTitle}
+                          onChange={(e) => setEditState((s) => ({ ...s, jobTitle: e.target.value, customTitle: '' }))}
+                        >
+                          {getJobTitleOptions(editState.role, editState.departmentId).map((t) => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                          <option value="__custom__">+ Custom title</option>
+                        </select>
+                        {editState.jobTitle === '__custom__' && (
+                          <input
+                            className="w-full rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+                            placeholder="Enter custom title"
+                            value={editState.customTitle}
+                            onChange={(e) => setEditState((s) => ({ ...s, customTitle: e.target.value }))}
+                          />
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex items-center justify-end gap-1">
@@ -191,23 +303,26 @@ export function EmployeeSettings() {
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-text-secondary">{getRoleLabel(profile.role)}</td>
+                  <td className="px-4 py-2.5 text-text-secondary">{getDisplayTitle(profile)}</td>
                   <td className="px-4 py-2.5">
-                    <div className="flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => startEdit(profile)}
-                        className="rounded p-1 text-text-tertiary hover:bg-surface-3 hover:text-text-primary"
-                        title="Edit"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(profile)}
-                        className="rounded p-1 text-text-tertiary hover:bg-surface-3 hover:text-red-500"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    {canManageEmployees && (
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => startEdit(profile)}
+                          className="rounded p-1 text-text-tertiary hover:bg-surface-3 hover:text-text-primary"
+                          title="Edit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(profile)}
+                          className="rounded p-1 text-text-tertiary hover:bg-surface-3 hover:text-red-500"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               )
@@ -234,26 +349,99 @@ export function EmployeeSettings() {
                   />
                 </td>
                 <td className="px-4 py-2">
-                  <select
-                    className="rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
-                    value={newEmployee.departmentId}
-                    onChange={(e) => setNewEmployee((s) => ({ ...s, departmentId: e.target.value }))}
-                  >
-                    {DEPARTMENTS.map((d) => (
-                      <option key={d.id} value={d.id}>{d.abbreviation}</option>
-                    ))}
-                  </select>
+                  {newEmployee.role === 'teacher' ? (
+                    <span className="inline-flex items-center rounded px-2 py-1 text-xs text-text-tertiary bg-surface-3">N/A</span>
+                  ) : (
+                    <select
+                      className="rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                      value={newEmployee.departmentId ?? ''}
+                      onChange={(e) => {
+                        const deptId = e.target.value
+                        const options = getJobTitleOptions(newEmployee.role, deptId)
+                        setNewEmployee((s) => ({
+                          ...s,
+                          departmentId: deptId,
+                          jobTitle: options[0] ?? '',
+                          customTitle: '',
+                        }))
+                      }}
+                    >
+                      {DEPARTMENTS.map((d) => (
+                        <option key={d.id} value={d.id}>{d.abbreviation}</option>
+                      ))}
+                    </select>
+                  )}
                 </td>
                 <td className="px-4 py-2">
                   <select
                     className="rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
                     value={newEmployee.role}
-                    onChange={(e) => setNewEmployee((s) => ({ ...s, role: e.target.value as Profile['role'] }))}
+                    onChange={(e) => {
+                      const role = e.target.value as Profile['role']
+                      const deptId = role === 'teacher' ? null : (newEmployee.departmentId ?? DEPARTMENTS[0].id)
+                      const options = getJobTitleOptions(role, deptId)
+                      setNewEmployee((s) => ({
+                        ...s,
+                        role,
+                        departmentId: deptId,
+                        jobTitle: options[0] ?? '',
+                        customTitle: '',
+                      }))
+                    }}
                   >
                     {ROLES.map((r) => (
                       <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                   </select>
+                </td>
+                <td className="px-4 py-2">
+                  {newEmployee.role === 'teacher' || newEmployee.role === 'admin' ? (
+                    <span className="inline-flex items-center rounded px-2 py-1 text-xs text-text-tertiary bg-surface-3">—</span>
+                  ) : newEmployee.role === 'department_lead' ? (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm text-text-primary">{getLeadTitleForDepartment(newEmployee.departmentId)}</span>
+                      {newEmployee.jobTitle === '__custom__' ? (
+                        <input
+                          className="w-full rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+                          placeholder="Custom title"
+                          value={newEmployee.customTitle}
+                          onChange={(e) => setNewEmployee((s) => ({ ...s, customTitle: e.target.value }))}
+                        />
+                      ) : null}
+                      <button
+                        type="button"
+                        className="text-xs text-accent hover:underline text-left"
+                        onClick={() => setNewEmployee((s) => ({
+                          ...s,
+                          jobTitle: s.jobTitle === '__custom__' ? getLeadTitleForDepartment(s.departmentId) : '__custom__',
+                          customTitle: '',
+                        }))}
+                      >
+                        {newEmployee.jobTitle === '__custom__' ? 'Use default' : 'Custom title'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      <select
+                        className="rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                        value={newEmployee.jobTitle}
+                        onChange={(e) => setNewEmployee((s) => ({ ...s, jobTitle: e.target.value, customTitle: '' }))}
+                      >
+                        {getJobTitleOptions(newEmployee.role, newEmployee.departmentId).map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                        <option value="__custom__">+ Custom title</option>
+                      </select>
+                      {newEmployee.jobTitle === '__custom__' && (
+                        <input
+                          className="w-full rounded border border-border-strong bg-surface-1 px-2 py-1 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+                          placeholder="Enter custom title"
+                          value={newEmployee.customTitle}
+                          onChange={(e) => setNewEmployee((s) => ({ ...s, customTitle: e.target.value }))}
+                        />
+                      )}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-2">
                   <div className="flex items-center justify-end gap-1">

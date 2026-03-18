@@ -364,7 +364,7 @@ function ChecklistRow({
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-export function TaskChecklist({ taskId }: { taskId: string }) {
+export function TaskChecklist({ taskId, readOnly = false }: { taskId: string; readOnly?: boolean }) {
   const {
     getChecklistForTask,
     toggleChecklistItem,
@@ -408,7 +408,7 @@ export function TaskChecklist({ taskId }: { taskId: string }) {
       {items.length === 0 ? (
         <p className="py-4 text-center text-xs text-text-tertiary">No checklist items yet.</p>
       ) : (
-        <div className="space-y-1">
+        <div className={`space-y-1 ${readOnly ? 'pointer-events-none opacity-60' : ''}`}>
           {items.map((item, index) => (
             <ChecklistRow
               key={item.id}
@@ -426,11 +426,13 @@ export function TaskChecklist({ taskId }: { taskId: string }) {
       )}
 
       {/* Add-item form */}
-      <AddItemForm
-        taskId={taskId}
-        nextSortOrder={items.length}
-        onAdd={() => { /* future: scroll to new item */ }}
-      />
+      {!readOnly && (
+        <AddItemForm
+          taskId={taskId}
+          nextSortOrder={items.length}
+          onAdd={() => { /* future: scroll to new item */ }}
+        />
+      )}
     </div>
   )
 }

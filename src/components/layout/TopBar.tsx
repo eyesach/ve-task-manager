@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Search, List, LayoutGrid, Plus, Table2, Menu } from 'lucide-react'
-import { useLocation, useParams } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { useUIStore } from '@/stores/uiStore'
 import { useFilterStore } from '@/stores/filterStore'
 import { useTaskStore } from '@/stores/taskStore'
@@ -10,18 +10,24 @@ import type { TaskStatus, TaskPriority } from '@/lib/types'
 import { TaskCreateModal } from '@/components/tasks/TaskCreateModal'
 import { ShortcutsOverlay } from '@/components/common/ShortcutsOverlay'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { usePermissions } from '@/hooks/usePermissions'
 
-/** Routes where task-specific controls (filters, view toggle, new task, period) should show */
+/** Routes where task filters, period, search, and new-task button should show */
 const TASK_ROUTES = new Set(['/inter-department', '/trade-shows', '/competitions'])
 
 function useViewContext() {
   const { pathname } = useLocation()
-  const { abbr } = useParams<{ abbr: string }>()
+
+  // Parse department abbreviation from URL since TopBar is outside <Routes>
+  const deptMatch = pathname.match(/^\/department\/([A-Za-z]+)$/)
+  const abbr = deptMatch?.[1]
 
   let title = 'Tasks'
   let subtitle: string | undefined
   let color: string | undefined
+  let departmentId: string | undefined
   let isTaskPage = false
+  let hasViewToggle = false
 
   if (abbr) {
     const dept = DEPARTMENTS.find((d) => d.abbreviation === abbr)
@@ -29,12 +35,15 @@ function useViewContext() {
       title = dept.name
       subtitle = dept.abbreviation
       color = dept.color
+      departmentId = dept.id
       isTaskPage = true
+      hasViewToggle = true // only department pages use list/board/log
     }
   } else if (TASK_ROUTES.has(pathname)) {
     isTaskPage = true
+    hasViewToggle = false // these have custom views, toggle does nothing
     const routeTitles: Record<string, string> = {
-      '/inter-department': 'Inter-Department Tasks',
+      '/inter-department': 'Inter-Department',
       '/trade-shows': 'Trade Shows',
       '/competitions': 'Competitions',
     }
@@ -49,7 +58,7 @@ function useViewContext() {
     title = routeTitles[pathname] ?? 'Tasks'
   }
 
-  return { title, subtitle, color, isTaskPage }
+  return { title, subtitle, color, departmentId, isTaskPage, hasViewToggle }
 }
 
 export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
@@ -66,71 +75,119 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
   } = useFilterStore()
   const { profiles } = useTaskStore()
   const { periods, activePeriodId, setActivePeriod } = usePeriodStore()
-  const { title, subtitle, color, isTaskPage } = useViewContext()
+  const { title, subtitle, color, departmentId, isTaskPage, hasViewToggle } = useViewContext()
+  const { canCreateTask } = usePermissions()
+  const showNewTaskButton = canCreateTask(departmentId)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
 
   useKeyboardShortcuts({
     onHelp: () => setShowShortcuts(true),
-    onNewTask: () => setShowCreateModal(true),
+    onNewTask: showNewTaskButton ? () => setShowCreateModal(true) : undefined,
   })
 
   return (
     <>
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle bg-surface-1 px-6">
-      {/* Left: hamburger (mobile) + View title */}
-      <div className="flex items-center gap-3">
+    <header className="shrink-0 border-b border-border-subtle bg-surface-1">
+      {/* Row 1: Title + New button + period selector + view toggle */}
+      <div className="flex h-12 items-center gap-3 px-4 sm:px-6">
         {onMenuToggle && (
           <button
             onClick={onMenuToggle}
-            className="mr-2 flex h-8 w-8 items-center justify-center rounded-lg text-text-secondary hover:bg-surface-3 md:hidden"
+            className="mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-secondary hover:bg-surface-3 md:hidden"
             aria-label="Open menu"
           >
             <Menu size={18} />
           </button>
         )}
         {color && (
-          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+          <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
         )}
-        <h2 className="text-base font-semibold text-text-primary">{title}</h2>
+        <h2 className="truncate text-base font-semibold text-text-primary">{title}</h2>
         {subtitle && (
-          <span className="rounded bg-surface-4 px-1.5 py-0.5 font-mono text-[11px] font-medium text-text-tertiary">
+          <span className="shrink-0 rounded bg-surface-4 px-1.5 py-0.5 font-mono text-[11px] font-medium text-text-tertiary">
             {subtitle}
           </span>
         )}
+
+        {isTaskPage && (
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {/* New Task button */}
+            {showNewTaskButton && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
+              >
+                <Plus size={14} />
+                <span>New</span>
+              </button>
+            )}
+
+            {/* Period selector */}
+            <div className="h-5 w-px shrink-0 bg-border-subtle" />
+            <select
+              value={activePeriodId}
+              onChange={(e) => setActivePeriod(e.target.value)}
+              className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs font-medium text-text-primary outline-none transition-colors focus:border-border-strong"
+            >
+              {periods.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+
+            {/* View mode toggle — only on department pages */}
+            {hasViewToggle && (
+              <>
+                <div className="h-5 w-px shrink-0 bg-border-subtle" />
+                <div className="flex rounded-md border border-border-subtle">
+                  <button
+                    onClick={() => setViewMode('list')}
+                    title="List view"
+                    className={`flex h-7 w-8 items-center justify-center transition-colors ${
+                      viewMode === 'list'
+                        ? 'bg-surface-3 text-text-primary'
+                        : 'text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    <List size={14} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('board')}
+                    title="Board view"
+                    className={`flex h-7 w-8 items-center justify-center border-l border-border-subtle transition-colors ${
+                      viewMode === 'board'
+                        ? 'bg-surface-3 text-text-primary'
+                        : 'text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    <LayoutGrid size={14} />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('log')}
+                    title="Log view"
+                    className={`flex h-7 w-8 items-center justify-center border-l border-border-subtle transition-colors ${
+                      viewMode === 'log'
+                        ? 'bg-surface-3 text-text-primary'
+                        : 'text-text-tertiary hover:text-text-secondary'
+                    }`}
+                  >
+                    <Table2 size={14} />
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Right: Task controls (only on task pages) */}
-      {isTaskPage ? (
-        <div className="flex items-center gap-2">
-          {/* New Task button */}
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
-          >
-            <Plus size={14} />
-            New Task
-          </button>
-
-          {/* Period selector */}
-          <select
-            value={activePeriodId}
-            onChange={(e) => setActivePeriod(e.target.value)}
-            className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs font-medium text-text-primary outline-none transition-colors focus:border-border-strong"
-          >
-            {periods.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-
-          {/* Separator */}
-          <div className="mx-1 h-5 w-px bg-border-subtle" />
-
+      {/* Row 2: Filters + search (only on task pages) */}
+      {isTaskPage && (
+        <div className="flex h-10 items-center gap-2 border-t border-border-subtle px-4 sm:px-6">
           {/* Status filter */}
           <select
             value={statusFilter ?? ''}
             onChange={(e) => setStatusFilter((e.target.value || null) as TaskStatus | null)}
-            className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
+            className="h-7 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
           >
             <option value="">All Statuses</option>
             {TASK_STATUSES.map((s) => (
@@ -144,7 +201,7 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
           <select
             value={priorityFilter ?? ''}
             onChange={(e) => setPriorityFilter((e.target.value || null) as TaskPriority | null)}
-            className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
+            className="h-7 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
           >
             <option value="">All Priorities</option>
             {TASK_PRIORITIES.map((p) => (
@@ -158,7 +215,7 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
           <select
             value={assigneeFilter ?? ''}
             onChange={(e) => setAssigneeFilter(e.target.value || null)}
-            className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
+            className="h-7 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
           >
             <option value="">All Assignees</option>
             {profiles.map((p) => (
@@ -168,59 +225,19 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
             ))}
           </select>
 
-          {/* Separator */}
-          <div className="mx-1 h-5 w-px bg-border-subtle" />
-
-          {/* Search */}
-          <div className="relative">
+          {/* Search — pushed right */}
+          <div className="relative ml-auto">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
             <input
               type="text"
               placeholder="Search tasks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 w-48 rounded-md border border-border-subtle bg-surface-2 pl-8 pr-3 text-xs text-text-primary outline-none transition-all placeholder:text-text-tertiary focus:w-64 focus:border-border-strong"
+              className="h-7 w-40 rounded-md border border-border-subtle bg-surface-2 pl-8 pr-3 text-xs text-text-primary outline-none placeholder:text-text-tertiary focus:border-border-strong"
             />
           </div>
-
-          {/* Separator */}
-          <div className="mx-1 h-5 w-px bg-border-subtle" />
-
-          {/* View mode toggle */}
-          <div className="flex rounded-md border border-border-subtle">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`flex h-7 w-8 items-center justify-center transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-surface-3 text-text-primary'
-                  : 'text-text-tertiary hover:text-text-secondary'
-              }`}
-            >
-              <List size={14} />
-            </button>
-            <button
-              onClick={() => setViewMode('board')}
-              className={`flex h-7 w-8 items-center justify-center border-l border-border-subtle transition-colors ${
-                viewMode === 'board'
-                  ? 'bg-surface-3 text-text-primary'
-                  : 'text-text-tertiary hover:text-text-secondary'
-              }`}
-            >
-              <LayoutGrid size={14} />
-            </button>
-            <button
-              onClick={() => setViewMode('log')}
-              className={`flex h-7 w-8 items-center justify-center border-l border-border-subtle transition-colors ${
-                viewMode === 'log'
-                  ? 'bg-surface-3 text-text-primary'
-                  : 'text-text-tertiary hover:text-text-secondary'
-              }`}
-            >
-              <Table2 size={14} />
-            </button>
-          </div>
         </div>
-      ) : null}
+      )}
     </header>
     <TaskCreateModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
     <ShortcutsOverlay open={showShortcuts} onClose={() => setShowShortcuts(false)} />
