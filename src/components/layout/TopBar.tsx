@@ -11,25 +11,45 @@ import { TaskCreateModal } from '@/components/tasks/TaskCreateModal'
 import { ShortcutsOverlay } from '@/components/common/ShortcutsOverlay'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
-function useViewTitle(): { title: string; subtitle?: string; color?: string } {
+/** Routes where task-specific controls (filters, view toggle, new task, period) should show */
+const TASK_ROUTES = new Set(['/inter-department', '/trade-shows', '/competitions'])
+
+function useViewContext() {
   const { pathname } = useLocation()
   const { abbr } = useParams<{ abbr: string }>()
 
+  let title = 'Tasks'
+  let subtitle: string | undefined
+  let color: string | undefined
+  let isTaskPage = false
+
   if (abbr) {
     const dept = DEPARTMENTS.find((d) => d.abbreviation === abbr)
-    if (dept) return { title: dept.name, subtitle: dept.abbreviation, color: dept.color }
+    if (dept) {
+      title = dept.name
+      subtitle = dept.abbreviation
+      color = dept.color
+      isTaskPage = true
+    }
+  } else if (TASK_ROUTES.has(pathname)) {
+    isTaskPage = true
+    const routeTitles: Record<string, string> = {
+      '/inter-department': 'Inter-Department Tasks',
+      '/trade-shows': 'Trade Shows',
+      '/competitions': 'Competitions',
+    }
+    title = routeTitles[pathname] ?? 'Tasks'
+  } else {
+    const routeTitles: Record<string, string> = {
+      '/': 'Dashboard',
+      '/calendar': 'Calendar',
+      '/print-requests': 'Print Requests',
+      '/settings': 'Settings',
+    }
+    title = routeTitles[pathname] ?? 'Tasks'
   }
 
-  const routeTitles: Record<string, string> = {
-    '/': 'Dashboard',
-    '/inter-department': 'Inter-Department Tasks',
-    '/trade-shows': 'Trade Shows',
-    '/competitions': 'Competitions',
-    '/calendar': 'Calendar',
-    '/print-requests': 'Print Requests',
-    '/settings': 'Settings',
-  }
-  return { title: routeTitles[pathname] ?? 'Tasks' }
+  return { title, subtitle, color, isTaskPage }
 }
 
 export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
@@ -46,7 +66,7 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
   } = useFilterStore()
   const { profiles } = useTaskStore()
   const { periods, activePeriodId, setActivePeriod } = usePeriodStore()
-  const { title, subtitle, color } = useViewTitle()
+  const { title, subtitle, color, isTaskPage } = useViewContext()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showShortcuts, setShowShortcuts] = useState(false)
 
@@ -80,124 +100,127 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
         )}
       </div>
 
-      {/* Right: New Task + Filters + Search + View toggle */}
-      <div className="flex items-center gap-2">
-        {/* New Task button */}
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
-        >
-          <Plus size={14} />
-          New Task
-        </button>
+      {/* Right: Task controls (only on task pages) */}
+      {isTaskPage ? (
+        <div className="flex items-center gap-2">
+          {/* New Task button */}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
+          >
+            <Plus size={14} />
+            New Task
+          </button>
 
-        {/* Period selector */}
-        <select
-          value={activePeriodId}
-          onChange={(e) => setActivePeriod(e.target.value)}
-          className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs font-medium text-text-primary outline-none transition-colors focus:border-border-strong"
-        >
-          {periods.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+          {/* Period selector */}
+          <select
+            value={activePeriodId}
+            onChange={(e) => setActivePeriod(e.target.value)}
+            className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs font-medium text-text-primary outline-none transition-colors focus:border-border-strong"
+          >
+            {periods.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
 
-        {/* Separator */}
-        <div className="mx-1 h-5 w-px bg-border-subtle" />
-        {/* Status filter */}
-        <select
-          value={statusFilter ?? ''}
-          onChange={(e) => setStatusFilter((e.target.value || null) as TaskStatus | null)}
-          className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
-        >
-          <option value="">All Statuses</option>
-          {TASK_STATUSES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+          {/* Separator */}
+          <div className="mx-1 h-5 w-px bg-border-subtle" />
 
-        {/* Priority filter */}
-        <select
-          value={priorityFilter ?? ''}
-          onChange={(e) => setPriorityFilter((e.target.value || null) as TaskPriority | null)}
-          className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
-        >
-          <option value="">All Priorities</option>
-          {TASK_PRIORITIES.map((p) => (
-            <option key={p.value} value={p.value}>
-              {p.label}
-            </option>
-          ))}
-        </select>
+          {/* Status filter */}
+          <select
+            value={statusFilter ?? ''}
+            onChange={(e) => setStatusFilter((e.target.value || null) as TaskStatus | null)}
+            className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
+          >
+            <option value="">All Statuses</option>
+            {TASK_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
 
-        {/* Assignee filter */}
-        <select
-          value={assigneeFilter ?? ''}
-          onChange={(e) => setAssigneeFilter(e.target.value || null)}
-          className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
-        >
-          <option value="">All Assignees</option>
-          {profiles.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.fullName}
-            </option>
-          ))}
-        </select>
+          {/* Priority filter */}
+          <select
+            value={priorityFilter ?? ''}
+            onChange={(e) => setPriorityFilter((e.target.value || null) as TaskPriority | null)}
+            className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
+          >
+            <option value="">All Priorities</option>
+            {TASK_PRIORITIES.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
 
-        {/* Separator */}
-        <div className="mx-1 h-5 w-px bg-border-subtle" />
+          {/* Assignee filter */}
+          <select
+            value={assigneeFilter ?? ''}
+            onChange={(e) => setAssigneeFilter(e.target.value || null)}
+            className="h-8 rounded-md border border-border-subtle bg-surface-2 px-2 text-xs text-text-secondary outline-none transition-colors focus:border-border-strong"
+          >
+            <option value="">All Assignees</option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.fullName}
+              </option>
+            ))}
+          </select>
 
-        {/* Search */}
-        <div className="relative">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
-          <input
-            type="text"
-            placeholder="Search tasks..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="h-8 w-48 rounded-md border border-border-subtle bg-surface-2 pl-8 pr-3 text-xs text-text-primary outline-none transition-all placeholder:text-text-tertiary focus:w-64 focus:border-border-strong"
-          />
+          {/* Separator */}
+          <div className="mx-1 h-5 w-px bg-border-subtle" />
+
+          {/* Search */}
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
+            <input
+              type="text"
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 w-48 rounded-md border border-border-subtle bg-surface-2 pl-8 pr-3 text-xs text-text-primary outline-none transition-all placeholder:text-text-tertiary focus:w-64 focus:border-border-strong"
+            />
+          </div>
+
+          {/* Separator */}
+          <div className="mx-1 h-5 w-px bg-border-subtle" />
+
+          {/* View mode toggle */}
+          <div className="flex rounded-md border border-border-subtle">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex h-7 w-8 items-center justify-center transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-surface-3 text-text-primary'
+                  : 'text-text-tertiary hover:text-text-secondary'
+              }`}
+            >
+              <List size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode('board')}
+              className={`flex h-7 w-8 items-center justify-center border-l border-border-subtle transition-colors ${
+                viewMode === 'board'
+                  ? 'bg-surface-3 text-text-primary'
+                  : 'text-text-tertiary hover:text-text-secondary'
+              }`}
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode('log')}
+              className={`flex h-7 w-8 items-center justify-center border-l border-border-subtle transition-colors ${
+                viewMode === 'log'
+                  ? 'bg-surface-3 text-text-primary'
+                  : 'text-text-tertiary hover:text-text-secondary'
+              }`}
+            >
+              <Table2 size={14} />
+            </button>
+          </div>
         </div>
-
-        {/* Separator */}
-        <div className="mx-1 h-5 w-px bg-border-subtle" />
-
-        {/* View mode toggle */}
-        <div className="flex rounded-md border border-border-subtle">
-          <button
-            onClick={() => setViewMode('list')}
-            className={`flex h-7 w-8 items-center justify-center transition-colors ${
-              viewMode === 'list'
-                ? 'bg-surface-3 text-text-primary'
-                : 'text-text-tertiary hover:text-text-secondary'
-            }`}
-          >
-            <List size={14} />
-          </button>
-          <button
-            onClick={() => setViewMode('board')}
-            className={`flex h-7 w-8 items-center justify-center border-l border-border-subtle transition-colors ${
-              viewMode === 'board'
-                ? 'bg-surface-3 text-text-primary'
-                : 'text-text-tertiary hover:text-text-secondary'
-            }`}
-          >
-            <LayoutGrid size={14} />
-          </button>
-          <button
-            onClick={() => setViewMode('log')}
-            className={`flex h-7 w-8 items-center justify-center border-l border-border-subtle transition-colors ${
-              viewMode === 'log'
-                ? 'bg-surface-3 text-text-primary'
-                : 'text-text-tertiary hover:text-text-secondary'
-            }`}
-          >
-            <Table2 size={14} />
-          </button>
-        </div>
-      </div>
+      ) : null}
     </header>
     <TaskCreateModal open={showCreateModal} onClose={() => setShowCreateModal(false)} />
     <ShortcutsOverlay open={showShortcuts} onClose={() => setShowShortcuts(false)} />
