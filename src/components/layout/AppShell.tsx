@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { useUIStore } from '@/stores/uiStore'
+import { useRealtimeSync } from '@/hooks/useRealtimeSync'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  useRealtimeSync()
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 

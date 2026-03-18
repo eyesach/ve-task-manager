@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { mapProfile } from '@/lib/supabase-types'
+import { setCompanyId } from '@/lib/supabaseService'
 import type { Profile } from '@/lib/types'
 
 interface AuthContextType {
@@ -34,7 +35,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    setProfile(mapProfile(data as Record<string, unknown>))
+    const mapped = mapProfile(data as Record<string, unknown>)
+    setCompanyId(mapped.companyId)
+    setProfile(mapped)
   }
 
   useEffect(() => {
