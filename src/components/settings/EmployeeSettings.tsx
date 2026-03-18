@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Pencil, Trash2, Plus, Check, X } from 'lucide-react'
+import { Pencil, Trash2, Plus, Check, X, Mail, Copy, CheckCircle } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { DEPARTMENTS, getLeadTitleForDepartment, getMemberTitlesForDepartment } from '@/lib/constants'
 import { COMPANY_ID } from '@/lib/ids'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { Modal } from '@/components/common/Modal'
 import { useToastStore } from '@/stores/toastStore'
 import { usePermissions } from '@/hooks/usePermissions'
+import { supabase } from '@/lib/supabase'
 import type { Profile } from '@/lib/types'
 
 const ROLES: { value: Profile['role']; label: string }[] = [
@@ -56,6 +58,24 @@ export function EmployeeSettings() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [newEmployee, setNewEmployee] = useState<EditState>(emptyEdit())
   const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null)
+
+  // Invite flow state
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteForm, setInviteForm] = useState<{
+    email: string
+    fullName: string
+    departmentId: string
+    role: Profile['role']
+  }>({
+    email: '',
+    fullName: '',
+    departmentId: DEPARTMENTS[0].id,
+    role: 'member',
+  })
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteResult, setInviteResult] = useState<{ email: string; password: string } | null>(null)
+  const [copiedPassword, setCopiedPassword] = useState(false)
 
   function startEdit(profile: Profile) {
     setEditingId(profile.id)
@@ -118,6 +138,70 @@ export function EmployeeSettings() {
     addToast('success', `${profile.fullName} added.`)
   }
 
+  function openInviteModal() {
+    setInviteForm({
+      email: '',
+      fullName: '',
+      departmentId: DEPARTMENTS[0].id as string,
+      role: 'member',
+    })
+    setInviteError(null)
+    setInviteResult(null)
+    setCopiedPassword(false)
+    setShowInviteModal(true)
+  }
+
+  function closeInviteModal() {
+    setShowInviteModal(false)
+    setInviteLoading(false)
+    setInviteError(null)
+    setInviteResult(null)
+  }
+
+  async function handleInvite() {
+    if (!inviteForm.email.trim() || !inviteForm.fullName.trim()) {
+      setInviteError('Email and full name are required.')
+      return
+    }
+    setInviteLoading(true)
+    setInviteError(null)
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: {
+          email: inviteForm.email.trim(),
+          full_name: inviteForm.fullName.trim(),
+          department_id: inviteForm.role === 'teacher' ? null : inviteForm.departmentId,
+          role: inviteForm.role,
+        },
+      })
+      if (error) {
+        setInviteError(error.message || 'Failed to send invite.')
+      } else if (data?.error) {
+        setInviteError(data.error)
+      } else {
+        setInviteResult({
+          email: inviteForm.email.trim(),
+          password: data.temporary_password ?? data.password ?? '',
+        })
+      }
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : 'An unexpected error occurred.')
+    } finally {
+      setInviteLoading(false)
+    }
+  }
+
+  async function copyPassword() {
+    if (!inviteResult) return
+    try {
+      await navigator.clipboard.writeText(inviteResult.password)
+      setCopiedPassword(true)
+      setTimeout(() => setCopiedPassword(false), 2000)
+    } catch {
+      addToast('error', 'Failed to copy to clipboard.')
+    }
+  }
+
   function getDeptName(deptId: string | null) {
     if (!deptId) return '—'
     return DEPARTMENTS.find((d) => d.id === deptId)?.abbreviation ?? '—'
@@ -138,13 +222,22 @@ export function EmployeeSettings() {
       <div className="flex items-center justify-between">
         <p className="text-sm text-text-secondary">{profiles.length} employees</p>
         {canManageEmployees && (
-          <button
-            onClick={() => { setShowAddForm(true); setNewEmployee(emptyEdit()) }}
-            className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover"
-          >
-            <Plus className="h-4 w-4" />
-            Add Employee
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openInviteModal}
+              className="flex items-center gap-1.5 rounded-lg border border-accent px-3 py-1.5 text-sm font-medium text-accent hover:bg-accent/10"
+            >
+              <Mail className="h-4 w-4" />
+              Invite Employee
+            </button>
+            <button
+              onClick={() => { setShowAddForm(true); setNewEmployee(emptyEdit()) }}
+              className="flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-hover"
+            >
+              <Plus className="h-4 w-4" />
+              Add Employee
+            </button>
+          </div>
         )}
       </div>
 
@@ -481,6 +574,143 @@ export function EmployeeSettings() {
         message={`Remove ${deleteTarget?.fullName ?? 'this employee'} from the company? This will also unassign them from all tasks.`}
         confirmLabel="Remove"
       />
+
+      {/* Invite Employee Modal */}
+      <Modal
+        open={showInviteModal}
+        onClose={closeInviteModal}
+        title="Invite Employee"
+        width="w-[480px]"
+        footer={
+          inviteResult ? (
+            <button
+              onClick={closeInviteModal}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"
+            >
+              Done
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={closeInviteModal}
+                className="rounded-lg border border-border-strong px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-3"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleInvite}
+                disabled={inviteLoading}
+                className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50"
+              >
+                {inviteLoading ? 'Sending...' : 'Send Invite'}
+              </button>
+            </>
+          )
+        }
+      >
+        {inviteResult ? (
+          <div className="flex flex-col gap-4">
+            <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-4">
+              <div className="flex items-center gap-2 text-green-600">
+                <CheckCircle className="h-5 w-5" />
+                <span className="text-sm font-medium">Account created successfully</span>
+              </div>
+              <p className="mt-1 text-sm text-text-secondary">
+                Account created for <span className="font-medium text-text-primary">{inviteResult.email}</span>
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">Temporary Password</label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 rounded-lg border border-border-strong bg-surface-2 px-3 py-2 text-sm font-mono text-text-primary select-all">
+                  {inviteResult.password}
+                </code>
+                <button
+                  onClick={copyPassword}
+                  className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-sm font-medium text-text-secondary hover:bg-surface-3"
+                >
+                  {copiedPassword ? (
+                    <>
+                      <Check className="h-4 w-4 text-green-600" />
+                      <span className="text-green-600">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-text-tertiary">
+                Share this password with the employee. They should change it after first login.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {inviteError && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-600">
+                {inviteError}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">Email <span className="text-red-500">*</span></label>
+              <input
+                type="email"
+                className="w-full rounded-lg border border-border-strong bg-surface-1 px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+                placeholder="employee@school.edu"
+                value={inviteForm.email}
+                onChange={(e) => setInviteForm((s) => ({ ...s, email: e.target.value }))}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">Full Name <span className="text-red-500">*</span></label>
+              <input
+                type="text"
+                className="w-full rounded-lg border border-border-strong bg-surface-1 px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+                placeholder="Jane Doe"
+                value={inviteForm.fullName}
+                onChange={(e) => setInviteForm((s) => ({ ...s, fullName: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">Department <span className="text-red-500">*</span></label>
+              {inviteForm.role === 'teacher' ? (
+                <span className="inline-flex items-center rounded-lg border border-border-strong bg-surface-2 px-3 py-2 text-sm text-text-tertiary">N/A (Teachers are not assigned to a department)</span>
+              ) : (
+                <select
+                  className="w-full rounded-lg border border-border-strong bg-surface-1 px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                  value={inviteForm.departmentId}
+                  onChange={(e) => setInviteForm((s) => ({ ...s, departmentId: e.target.value }))}
+                >
+                  {DEPARTMENTS.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name} ({d.abbreviation})</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">Role <span className="text-red-500">*</span></label>
+              <select
+                className="w-full rounded-lg border border-border-strong bg-surface-1 px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                value={inviteForm.role}
+                onChange={(e) => setInviteForm((s) => ({ ...s, role: e.target.value as Profile['role'] }))}
+              >
+                {ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
