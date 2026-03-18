@@ -19,6 +19,24 @@ import {
   MOCK_COMMENTS,
   MOCK_TASK_DEPARTMENTS,
 } from '@/lib/mockData'
+import {
+  insertTask,
+  updateTaskRow,
+  deleteTaskRow,
+  insertChecklistItem as dbInsertChecklist,
+  updateChecklistItemRow,
+  deleteChecklistItemRow,
+  insertAssignee as dbInsertAssignee,
+  deleteAssigneeRow,
+  updateAssigneeRow,
+  insertComment as dbInsertComment,
+  deleteCommentRow,
+  insertTaskDepartment as dbInsertTaskDept,
+  deleteTaskDepartmentRow,
+  insertProfile as dbInsertProfile,
+  updateProfileRow,
+  deleteProfileRow,
+} from '@/lib/supabaseService'
 
 // Suppress unused-import lint warnings for re-exported types used only in JSDoc
 void (undefined as unknown as TaskPriority)
@@ -79,6 +97,21 @@ interface TaskState {
 
   // --- Task code helper ---
   getNextTaskCode: (departmentAbbr: string, periodNumber: number) => string
+
+  // --- Realtime event handlers (pure local state, no DB writes) ---
+  applyRealtimeTaskInsert: (task: Task) => void
+  applyRealtimeTaskUpdate: (taskId: string, updates: Partial<Task>) => void
+  applyRealtimeTaskDelete: (taskId: string) => void
+  applyRealtimeChecklistInsert: (item: ChecklistItem) => void
+  applyRealtimeChecklistUpdate: (itemId: string, updates: Partial<ChecklistItem>) => void
+  applyRealtimeChecklistDelete: (itemId: string) => void
+  applyRealtimeAssigneeInsert: (assignee: TaskAssignee) => void
+  applyRealtimeAssigneeDelete: (assigneeId: string) => void
+  applyRealtimeCommentInsert: (comment: TaskComment) => void
+  applyRealtimeCommentDelete: (commentId: string) => void
+  applyRealtimeProfileInsert: (profile: Profile) => void
+  applyRealtimeProfileUpdate: (profileId: string, updates: Partial<Profile>) => void
+  applyRealtimeProfileDelete: (profileId: string) => void
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -120,119 +153,143 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   // ─── Mutations (existing) ───────────────────────────────────────────────────
 
-  updateTaskStatus: (taskId, status) =>
+  updateTaskStatus: (taskId, status) => {
     set((s) => ({
       tasks: s.tasks.map((t) =>
         t.id === taskId ? { ...t, status, updatedAt: new Date().toISOString() } : t
       ),
-    })),
+    }))
+    updateTaskRow(taskId, { status })
+  },
 
-  updateTaskDescription: (taskId, description) =>
+  updateTaskDescription: (taskId, description) => {
     set((s) => ({
       tasks: s.tasks.map((t) =>
         t.id === taskId ? { ...t, description, updatedAt: new Date().toISOString() } : t
       ),
-    })),
+    }))
+    updateTaskRow(taskId, { description })
+  },
 
-  toggleChecklistItem: (itemId) =>
+  toggleChecklistItem: (itemId) => {
+    const item = get().checklists.find((c) => c.id === itemId)
+    const newVal = item ? !item.isCompleted : true
     set((s) => ({
       checklists: s.checklists.map((c) =>
-        c.id === itemId ? { ...c, isCompleted: !c.isCompleted } : c
+        c.id === itemId ? { ...c, isCompleted: newVal } : c
       ),
-    })),
+    }))
+    updateChecklistItemRow(itemId, { isCompleted: newVal })
+  },
 
   // ─── Task CRUD ──────────────────────────────────────────────────────────────
 
-  addTask: (task) =>
-    set((s) => ({ tasks: [...s.tasks, task] })),
+  addTask: (task) => {
+    set((s) => ({ tasks: [...s.tasks, task] }))
+    insertTask(task)
+  },
 
-  updateTask: (taskId, updates) =>
+  updateTask: (taskId, updates) => {
     set((s) => ({
       tasks: s.tasks.map((t) =>
         t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
       ),
-    })),
+    }))
+    updateTaskRow(taskId, updates)
+  },
 
-  deleteTask: (taskId) =>
+  deleteTask: (taskId) => {
     set((s) => ({
       tasks: s.tasks.filter((t) => t.id !== taskId),
       checklists: s.checklists.filter((c) => c.taskId !== taskId),
       assignees: s.assignees.filter((a) => a.taskId !== taskId),
       comments: s.comments.filter((cm) => cm.taskId !== taskId),
       taskDepartments: s.taskDepartments.filter((td) => td.taskId !== taskId),
-    })),
+    }))
+    deleteTaskRow(taskId)
+  },
 
   // ─── Assignee CRUD ──────────────────────────────────────────────────────────
 
-  addAssignee: (taskId, profileId, isPrimary) =>
-    set((s) => ({
-      assignees: [
-        ...s.assignees,
-        { id: crypto.randomUUID(), taskId, profileId, isPrimary },
-      ],
-    })),
+  addAssignee: (taskId, profileId, isPrimary) => {
+    const assignee = { id: crypto.randomUUID(), taskId, profileId, isPrimary }
+    set((s) => ({ assignees: [...s.assignees, assignee] }))
+    dbInsertAssignee(assignee)
+  },
 
-  removeAssignee: (taskId, profileId) =>
+  removeAssignee: (taskId, profileId) => {
     set((s) => ({
       assignees: s.assignees.filter(
         (a) => !(a.taskId === taskId && a.profileId === profileId)
       ),
-    })),
+    }))
+    deleteAssigneeRow(taskId, profileId)
+  },
 
-  togglePrimaryAssignee: (taskId, profileId) =>
+  togglePrimaryAssignee: (taskId, profileId) => {
+    const existing = get().assignees.find((a) => a.taskId === taskId && a.profileId === profileId)
+    const newVal = existing ? !existing.isPrimary : true
     set((s) => ({
       assignees: s.assignees.map((a) =>
         a.taskId === taskId && a.profileId === profileId
-          ? { ...a, isPrimary: !a.isPrimary }
+          ? { ...a, isPrimary: newVal }
           : a
       ),
-    })),
+    }))
+    updateAssigneeRow(taskId, profileId, newVal)
+  },
 
   // ─── Checklist CRUD ─────────────────────────────────────────────────────────
 
-  addChecklistItem: (item) =>
-    set((s) => ({ checklists: [...s.checklists, item] })),
+  addChecklistItem: (item) => {
+    set((s) => ({ checklists: [...s.checklists, item] }))
+    dbInsertChecklist(item)
+  },
 
-  updateChecklistItem: (itemId, updates) =>
+  updateChecklistItem: (itemId, updates) => {
     set((s) => ({
       checklists: s.checklists.map((c) =>
         c.id === itemId ? { ...c, ...updates } : c
       ),
-    })),
+    }))
+    updateChecklistItemRow(itemId, updates)
+  },
 
-  deleteChecklistItem: (itemId) =>
-    set((s) => ({ checklists: s.checklists.filter((c) => c.id !== itemId) })),
+  deleteChecklistItem: (itemId) => {
+    set((s) => ({ checklists: s.checklists.filter((c) => c.id !== itemId) }))
+    deleteChecklistItemRow(itemId)
+  },
 
-  reorderChecklistItem: (itemId, direction) =>
-    set((s) => {
-      const item = s.checklists.find((c) => c.id === itemId)
-      if (!item) return s
+  reorderChecklistItem: (itemId, direction) => {
+    const state = get()
+    const item = state.checklists.find((c) => c.id === itemId)
+    if (!item) return
 
-      // Work only within the same task's checklist, sorted by current sortOrder
-      const taskItems = s.checklists
-        .filter((c) => c.taskId === item.taskId)
-        .sort((a, b) => a.sortOrder - b.sortOrder)
+    const taskItems = state.checklists
+      .filter((c) => c.taskId === item.taskId)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
 
-      const idx = taskItems.findIndex((c) => c.id === itemId)
-      const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    const idx = taskItems.findIndex((c) => c.id === itemId)
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= taskItems.length) return
 
-      if (swapIdx < 0 || swapIdx >= taskItems.length) return s
+    const swapItem = taskItems[swapIdx]
+    if (!swapItem) return
 
-      const swapItem = taskItems[swapIdx]
-      if (!swapItem) return s
+    const newSortOrderForItem = swapItem.sortOrder
+    const newSortOrderForSwap = item.sortOrder
+    const swapItemId = swapItem.id
 
-      const newSortOrderForItem = swapItem.sortOrder
-      const newSortOrderForSwap = item.sortOrder
-      const swapItemId = swapItem.id
-
-      return {
-        checklists: s.checklists.map((c) => {
-          if (c.id === itemId) return { ...c, sortOrder: newSortOrderForItem }
-          if (c.id === swapItemId) return { ...c, sortOrder: newSortOrderForSwap }
-          return c
-        }),
-      }
-    }),
+    set((s) => ({
+      checklists: s.checklists.map((c) => {
+        if (c.id === itemId) return { ...c, sortOrder: newSortOrderForItem }
+        if (c.id === swapItemId) return { ...c, sortOrder: newSortOrderForSwap }
+        return c
+      }),
+    }))
+    updateChecklistItemRow(itemId, { sortOrder: newSortOrderForItem })
+    updateChecklistItemRow(swapItemId, { sortOrder: newSortOrderForSwap })
+  },
 
   // ─── Comments ───────────────────────────────────────────────────────────────
 
@@ -241,42 +298,56 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       .comments.filter((cm) => cm.taskId === taskId)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
 
-  addComment: (comment) =>
-    set((s) => ({ comments: [...s.comments, comment] })),
+  addComment: (comment) => {
+    set((s) => ({ comments: [...s.comments, comment] }))
+    dbInsertComment(comment)
+  },
 
-  deleteComment: (commentId) =>
-    set((s) => ({ comments: s.comments.filter((cm) => cm.id !== commentId) })),
+  deleteComment: (commentId) => {
+    set((s) => ({ comments: s.comments.filter((cm) => cm.id !== commentId) }))
+    deleteCommentRow(commentId)
+  },
 
   // ─── Task Departments ────────────────────────────────────────────────────────
 
   getTaskDepartments: (taskId) =>
     get().taskDepartments.filter((td) => td.taskId === taskId),
 
-  addTaskDepartment: (td) =>
-    set((s) => ({ taskDepartments: [...s.taskDepartments, td] })),
+  addTaskDepartment: (td) => {
+    set((s) => ({ taskDepartments: [...s.taskDepartments, td] }))
+    dbInsertTaskDept(td)
+  },
 
-  removeTaskDepartment: (tdId) =>
+  removeTaskDepartment: (tdId) => {
     set((s) => ({
       taskDepartments: s.taskDepartments.filter((td) => td.id !== tdId),
-    })),
+    }))
+    deleteTaskDepartmentRow(tdId)
+  },
 
   // ─── Profile CRUD (admin) ────────────────────────────────────────────────────
 
-  addProfile: (profile) =>
-    set((s) => ({ profiles: [...s.profiles, profile] })),
+  addProfile: (profile) => {
+    set((s) => ({ profiles: [...s.profiles, profile] }))
+    dbInsertProfile(profile)
+  },
 
-  updateProfile: (profileId, updates) =>
+  updateProfile: (profileId, updates) => {
     set((s) => ({
       profiles: s.profiles.map((p) =>
         p.id === profileId ? { ...p, ...updates } : p
       ),
-    })),
+    }))
+    updateProfileRow(profileId, updates)
+  },
 
-  deleteProfile: (profileId) =>
+  deleteProfile: (profileId) => {
     set((s) => ({
       profiles: s.profiles.filter((p) => p.id !== profileId),
       assignees: s.assignees.filter((a) => a.profileId !== profileId),
-    })),
+    }))
+    deleteProfileRow(profileId)
+  },
 
   // ─── Task code helper ────────────────────────────────────────────────────────
 
@@ -292,4 +363,76 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const maxSeq = existing.length > 0 ? Math.max(...existing) : 0
     return `${prefix}${maxSeq + 1}`
   },
+
+  // ─── Realtime event handlers (pure local state, no DB writes) ──────────────
+
+  applyRealtimeTaskInsert: (task) =>
+    set((s) => ({
+      tasks: s.tasks.some((t) => t.id === task.id) ? s.tasks : [...s.tasks, task],
+    })),
+
+  applyRealtimeTaskUpdate: (taskId, updates) =>
+    set((s) => ({
+      tasks: s.tasks.map((t) => (t.id === taskId ? { ...t, ...updates } : t)),
+    })),
+
+  applyRealtimeTaskDelete: (taskId) =>
+    set((s) => ({
+      tasks: s.tasks.filter((t) => t.id !== taskId),
+      checklists: s.checklists.filter((c) => c.taskId !== taskId),
+      assignees: s.assignees.filter((a) => a.taskId !== taskId),
+      comments: s.comments.filter((cm) => cm.taskId !== taskId),
+      taskDepartments: s.taskDepartments.filter((td) => td.taskId !== taskId),
+    })),
+
+  applyRealtimeChecklistInsert: (item) =>
+    set((s) => ({
+      checklists: s.checklists.some((c) => c.id === item.id) ? s.checklists : [...s.checklists, item],
+    })),
+
+  applyRealtimeChecklistUpdate: (itemId, updates) =>
+    set((s) => ({
+      checklists: s.checklists.map((c) => (c.id === itemId ? { ...c, ...updates } : c)),
+    })),
+
+  applyRealtimeChecklistDelete: (itemId) =>
+    set((s) => ({
+      checklists: s.checklists.filter((c) => c.id !== itemId),
+    })),
+
+  applyRealtimeAssigneeInsert: (assignee) =>
+    set((s) => ({
+      assignees: s.assignees.some((a) => a.id === assignee.id) ? s.assignees : [...s.assignees, assignee],
+    })),
+
+  applyRealtimeAssigneeDelete: (assigneeId) =>
+    set((s) => ({
+      assignees: s.assignees.filter((a) => a.id !== assigneeId),
+    })),
+
+  applyRealtimeCommentInsert: (comment) =>
+    set((s) => ({
+      comments: s.comments.some((cm) => cm.id === comment.id) ? s.comments : [...s.comments, comment],
+    })),
+
+  applyRealtimeCommentDelete: (commentId) =>
+    set((s) => ({
+      comments: s.comments.filter((cm) => cm.id !== commentId),
+    })),
+
+  applyRealtimeProfileInsert: (profile) =>
+    set((s) => ({
+      profiles: s.profiles.some((p) => p.id === profile.id) ? s.profiles : [...s.profiles, profile],
+    })),
+
+  applyRealtimeProfileUpdate: (profileId, updates) =>
+    set((s) => ({
+      profiles: s.profiles.map((p) => (p.id === profileId ? { ...p, ...updates } : p)),
+    })),
+
+  applyRealtimeProfileDelete: (profileId) =>
+    set((s) => ({
+      profiles: s.profiles.filter((p) => p.id !== profileId),
+      assignees: s.assignees.filter((a) => a.profileId !== profileId),
+    })),
 }))

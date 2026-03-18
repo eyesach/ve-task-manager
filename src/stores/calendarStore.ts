@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { CalendarEvent } from '@/lib/types'
 import { MOCK_CALENDAR_EVENTS } from '@/lib/mockData'
+import { insertCalendarEvent as dbInsertEvent, updateCalendarEventRow, deleteCalendarEventRow } from '@/lib/supabaseService'
 
 interface CalendarState {
   events: CalendarEvent[]
@@ -9,6 +10,10 @@ interface CalendarState {
   addEvent: (event: CalendarEvent) => void
   updateEvent: (eventId: string, updates: Partial<CalendarEvent>) => void
   deleteEvent: (eventId: string) => void
+  // Realtime event handlers (pure local state, no DB writes)
+  applyRealtimeEventInsert: (event: CalendarEvent) => void
+  applyRealtimeEventUpdate: (eventId: string, updates: Partial<CalendarEvent>) => void
+  applyRealtimeEventDelete: (eventId: string) => void
 }
 
 export const useCalendarStore = create<CalendarState>((set, get) => ({
@@ -25,13 +30,35 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     return get().events.filter((e) => e.startDate.startsWith(prefix))
   },
 
-  addEvent: (event) => set((s) => ({ events: [...s.events, event] })),
+  addEvent: (event) => {
+    set((s) => ({ events: [...s.events, event] }))
+    dbInsertEvent(event)
+  },
 
-  updateEvent: (eventId, updates) =>
+  updateEvent: (eventId, updates) => {
+    set((s) => ({
+      events: s.events.map((e) => (e.id === eventId ? { ...e, ...updates } : e)),
+    }))
+    updateCalendarEventRow(eventId, updates)
+  },
+
+  deleteEvent: (eventId) => {
+    set((s) => ({ events: s.events.filter((e) => e.id !== eventId) }))
+    deleteCalendarEventRow(eventId)
+  },
+
+  // ─── Realtime event handlers ───────────────────────────────────────────────
+
+  applyRealtimeEventInsert: (event) =>
+    set((s) => ({
+      events: s.events.some((e) => e.id === event.id) ? s.events : [...s.events, event],
+    })),
+
+  applyRealtimeEventUpdate: (eventId, updates) =>
     set((s) => ({
       events: s.events.map((e) => (e.id === eventId ? { ...e, ...updates } : e)),
     })),
 
-  deleteEvent: (eventId) =>
+  applyRealtimeEventDelete: (eventId) =>
     set((s) => ({ events: s.events.filter((e) => e.id !== eventId) })),
 }))
