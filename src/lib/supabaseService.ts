@@ -231,6 +231,15 @@ export async function insertProfile(profile: Profile) {
 
 export async function updateProfileRow(profileId: string, updates: Partial<Profile>) {
   if (!isSupabaseConfigured()) return
+
+  // If email changed, update auth.users via Edge Function
+  if (updates.email) {
+    const { error: fnError } = await supabase.functions.invoke('update-user', {
+      body: { user_id: profileId, email: updates.email },
+    })
+    if (fnError) console.error('updateAuthUser:', fnError)
+  }
+
   const { error } = await supabase.from('profiles').update(profileToRow(updates)).eq('id', profileId)
   if (error) console.error('updateProfile:', error)
 }
