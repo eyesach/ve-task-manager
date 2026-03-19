@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { LogOut } from 'lucide-react'
+import { useAuth } from '../auth/AuthProvider'
 import { EmployeeSettings } from './EmployeeSettings'
 import { DepartmentSettings } from './DepartmentSettings'
 import { PeriodSettings } from './PeriodSettings'
@@ -15,12 +17,22 @@ type TabId = (typeof TABS)[number]['id']
 
 export function SettingsView() {
   const [activeTab, setActiveTab] = useState<TabId>('employees')
+  const { signOut } = useAuth()
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <div>
-        <h1 className="text-xl font-semibold text-text-primary">Settings</h1>
-        <p className="mt-1 text-sm text-text-tertiary">Manage your company configuration, employees, and task periods.</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-text-primary">Settings</h1>
+          <p className="mt-1 text-sm text-text-tertiary">Manage your company configuration, employees, and task periods.</p>
+        </div>
+        <button
+          onClick={() => signOut()}
+          className="flex items-center gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </button>
       </div>
 
       {/* Tab Bar */}
