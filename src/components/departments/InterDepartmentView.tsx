@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
@@ -115,7 +115,8 @@ function IDTaskRow({ task, isExpanded, onToggleExpand }: TaskRowProps) {
 }
 
 export function InterDepartmentView() {
-  const tasks = useTaskStore((s) => s.getTasksByCategory('inter_department'))
+  const allTasks = useTaskStore((s) => s.tasks)
+  const tasks = useMemo(() => allTasks.filter((t) => t.category === 'inter_department'), [allTasks])
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
 
   function handleToggleExpand(id: string) {
@@ -128,14 +129,6 @@ export function InterDepartmentView() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-semibold text-text-primary">Inter-Department Tasks</h1>
-        <p className="mt-0.5 text-sm text-text-secondary">
-          Tasks that span multiple departments — each department has specific responsibilities.
-        </p>
-      </div>
-
       {/* Summary stats */}
       <div className="flex gap-4">
         <div className="rounded-lg border border-border-subtle bg-surface-1 px-4 py-3 text-center">

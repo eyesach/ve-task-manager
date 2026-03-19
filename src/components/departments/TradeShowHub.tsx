@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { format } from 'date-fns'
 import { CalendarDays, ExternalLink } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
@@ -160,8 +161,10 @@ function UnlinkedTasks({ tasks }: { tasks: Task[] }) {
 }
 
 export function TradeShowHub() {
-  const allTasks = useTaskStore((s) => s.getTasksByCategory('trade_show'))
-  const events = useCalendarStore((s) => s.events).filter((e) => e.eventType === 'trade_show')
+  const storeTasks = useTaskStore((s) => s.tasks)
+  const allTasks = useMemo(() => storeTasks.filter((t) => t.category === 'trade_show'), [storeTasks])
+  const storeEvents = useCalendarStore((s) => s.events)
+  const events = useMemo(() => storeEvents.filter((e) => e.eventType === 'trade_show'), [storeEvents])
 
   // Group tasks by event (via relatedTaskId on the event, or task IDs linked from event)
   const linkedTaskIds = new Set<string>()

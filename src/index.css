@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+@theme {
+  /* Department colors */
+  --color-dept-ad: #4F46E5;
+  --color-dept-af: #059669;
+  --color-dept-bd: #D97706;
+  --color-dept-do: #7C3AED;
+  --color-dept-hr: #DC2626;
+  --color-dept-mk: #2563EB;
+  --color-dept-sp: #0891B2;
+
+  /* Status colors */
+  --color-status-not-started: #6B7280;
+  --color-status-in-progress: #3B82F6;
+  --color-status-in-review: #F59E0B;
+  --color-status-completed: #10B981;
+  --color-status-carried-over: #EF4444;
+
+  /* Priority colors */
+  --color-priority-low: #9CA3AF;
+  --color-priority-normal: #6B7280;
+  --color-priority-high: #F59E0B;
+  --color-priority-critical: #EF4444;
+
+  /* Surface palette — dark-first, editorial */
+  --color-surface-0: #09090B;
+  --color-surface-1: #111114;
+  --color-surface-2: #18181B;
+  --color-surface-3: #1F1F23;
+  --color-surface-4: #27272A;
+
+  --color-border-subtle: #27272A;
+  --color-border-default: #3F3F46;
+  --color-border-strong: #52525B;
+
+  --color-text-primary: #FAFAFA;
+  --color-text-secondary: #A1A1AA;
+  --color-text-tertiary: #71717A;
+  --color-text-inverse: #09090B;
+
+  --color-accent: #6366F1;
+  --color-accent-hover: #818CF8;
+
+  /* Fonts */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Sidebar width */
+  --spacing-sidebar: 260px;
+  --spacing-sidebar-collapsed: 64px;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border-subtle);
+  }
+
+  body {
+    @apply bg-surface-0 text-text-primary antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border-default);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border-strong);
+  }
+}
+
+/* Tiptap editor styles */
+.tiptap-editor,
+.tiptap-viewer {
+  @apply text-sm leading-relaxed text-text-secondary outline-none;
+}
+
+.tiptap-editor {
+  @apply min-h-[100px] px-3 py-2.5;
+}
+
+.tiptap-editor p.is-editor-empty:first-child::before {
+  @apply pointer-events-none float-left h-0 text-text-tertiary;
+  content: attr(data-placeholder);
+}
+
+.tiptap-editor:focus,
+.tiptap-viewer:focus {
+  outline: none;
+}
+
+.tiptap-editor h2,
+.tiptap-viewer h2 {
+  @apply mb-2 mt-4 text-base font-semibold text-text-primary;
+}
+
+.tiptap-editor h3,
+.tiptap-viewer h3 {
+  @apply mb-1.5 mt-3 text-sm font-semibold text-text-primary;
+}
+
+.tiptap-editor p,
+.tiptap-viewer p {
+  @apply mb-1.5;
+}
+
+.tiptap-editor p:last-child,
+.tiptap-viewer p:last-child {
+  @apply mb-0;
+}
+
+.tiptap-editor ul,
+.tiptap-viewer ul {
+  @apply my-1.5 list-disc pl-5;
+}
+
+.tiptap-editor ol,
+.tiptap-viewer ol {
+  @apply my-1.5 list-decimal pl-5;
+}
+
+.tiptap-editor li,
+.tiptap-viewer li {
+  @apply mb-0.5;
+}
+
+.tiptap-editor blockquote,
+.tiptap-viewer blockquote {
+  @apply my-2 border-l-2 border-accent/40 pl-3 italic text-text-tertiary;
+}
+
+.tiptap-editor hr,
+.tiptap-viewer hr {
+  @apply my-3 border-border-subtle;
+}
+
+.tiptap-editor code,
+.tiptap-viewer code {
+  @apply rounded bg-surface-3 px-1 py-0.5 font-mono text-xs text-accent-hover;
+}
+
+.tiptap-link {
+  @apply text-accent-hover underline decoration-accent/30 underline-offset-2 transition-colors hover:text-accent hover:decoration-accent/60;
+}
+
+.tiptap-editor strong,
+.tiptap-viewer strong {
+  @apply font-semibold text-text-primary;
+}
+
+/* Toast animation */
+@keyframes slide-in-from-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in-right {
+  animation: slide-in-from-right 0.2s ease-out;
+}
+
+/* Skeleton loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--color-surface-3) 25%, var(--color-surface-4) 50%, var(--color-surface-3) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+/* Calendar grid */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}

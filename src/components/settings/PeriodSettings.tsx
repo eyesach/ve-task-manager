@@ -75,6 +75,9 @@ export function PeriodSettings() {
     addToast('success', `${period.name} added.`)
   }
 
+  const manualOverrideId = usePeriodStore((s) => s.manualOverrideId)
+  const clearManualOverride = usePeriodStore((s) => s.clearManualOverride)
+
   function handleSetActive(periodId: string) {
     setActivePeriod(periodId)
     const period = periods.find((p) => p.id === periodId)
@@ -84,7 +87,20 @@ export function PeriodSettings() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-text-secondary">{periods.length} periods</p>
+        <div className="flex flex-col gap-0.5">
+          <p className="text-sm text-text-secondary">{periods.length} periods</p>
+          <p className="text-xs text-text-tertiary">
+            Active period is auto-detected from today's date.
+            {manualOverrideId && (
+              <>
+                {' '}Manual override active —{' '}
+                <button onClick={() => { clearManualOverride(); addToast('info', 'Switched back to auto-detect.') }} className="text-accent hover:underline">
+                  reset to auto
+                </button>
+              </>
+            )}
+          </p>
+        </div>
         {canManageSettings && (
           <button
             onClick={() => { setShowAddForm(true); setNewPeriod(emptyPeriod()) }}

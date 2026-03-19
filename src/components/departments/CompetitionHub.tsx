@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { differenceInCalendarDays, format, isPast } from 'date-fns'
 import { CalendarDays, Clock, Trophy } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
@@ -219,8 +220,10 @@ function UnlinkedTasks({ tasks }: { tasks: Task[] }) {
 }
 
 export function CompetitionHub() {
-  const allTasks = useTaskStore((s) => s.getTasksByCategory('competition'))
-  const events = useCalendarStore((s) => s.events).filter((e) => e.eventType === 'competition')
+  const storeTasks = useTaskStore((s) => s.tasks)
+  const allTasks = useMemo(() => storeTasks.filter((t) => t.category === 'competition'), [storeTasks])
+  const storeEvents = useCalendarStore((s) => s.events)
+  const events = useMemo(() => storeEvents.filter((e) => e.eventType === 'competition'), [storeEvents])
 
   const linkedTaskIds = new Set<string>()
 

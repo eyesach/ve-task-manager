@@ -3,6 +3,7 @@ import { Modal } from '@/components/common/Modal'
 import { useCalendarStore } from '@/stores/calendarStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { useToastStore } from '@/stores/toastStore'
+import { COMPANY_ID } from '@/lib/ids'
 import { EVENT_TYPES } from '@/lib/constants'
 import type { CalendarEvent } from '@/lib/types'
 
@@ -30,7 +31,7 @@ export function EventCreateModal({ open, onClose, defaultDate }: EventCreateModa
 
     addEvent({
       id: crypto.randomUUID(),
-      companyId: 'siply',
+      companyId: COMPANY_ID,
       title: title.trim(),
       eventType,
       startDate,
