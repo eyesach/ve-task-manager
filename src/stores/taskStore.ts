@@ -92,7 +92,7 @@ interface TaskState {
 
   // --- Profile CRUD (admin) ---
   addProfile: (profile: Profile) => void
-  updateProfile: (profileId: string, updates: Partial<Profile>) => void
+  updateProfile: (profileId: string, updates: Partial<Profile>) => Promise<{ authError?: string }>
   deleteProfile: (profileId: string) => void
 
   // --- Task code helper ---
@@ -332,13 +332,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     dbInsertProfile(profile)
   },
 
-  updateProfile: (profileId, updates) => {
+  updateProfile: async (profileId, updates) => {
     set((s) => ({
       profiles: s.profiles.map((p) =>
         p.id === profileId ? { ...p, ...updates } : p
       ),
     }))
-    updateProfileRow(profileId, updates)
+    return await updateProfileRow(profileId, updates)
   },
 
   deleteProfile: (profileId) => {

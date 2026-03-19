@@ -229,19 +229,28 @@ export async function insertProfile(profile: Profile) {
   if (error) console.error('insertProfile:', error)
 }
 
-export async function updateProfileRow(profileId: string, updates: Partial<Profile>) {
-  if (!isSupabaseConfigured()) return
+export async function updateProfileRow(profileId: string, updates: Partial<Profile>): Promise<{ authError?: string }> {
+  if (!isSupabaseConfigured()) return {}
 
   // If email changed, update auth.users via Edge Function
   if (updates.email) {
-    const { error: fnError } = await supabase.functions.invoke('update-user', {
+    const { data, error: fnError } = await supabase.functions.invoke('update-user', {
       body: { user_id: profileId, email: updates.email },
     })
-    if (fnError) console.error('updateAuthUser:', fnError)
+    if (fnError) {
+      console.error('updateAuthUser:', fnError)
+      return { authError: `Failed to update login email: ${fnError.message}` }
+    }
+    // Check for application-level errors in the response
+    if (data?.error) {
+      console.error('updateAuthUser:', data.error)
+      return { authError: `Failed to update login email: ${data.error}` }
+    }
   }
 
   const { error } = await supabase.from('profiles').update(profileToRow(updates)).eq('id', profileId)
   if (error) console.error('updateProfile:', error)
+  return {}
 }
 
 export async function deleteProfileRow(profileId: string) {

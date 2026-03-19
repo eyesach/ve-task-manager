@@ -97,12 +97,12 @@ export function EmployeeSettings() {
     return state.jobTitle || undefined
   }
 
-  function saveEdit(profileId: string) {
+  async function saveEdit(profileId: string) {
     if (!editState.fullName.trim()) {
       addToast('error', 'Name is required.')
       return
     }
-    updateProfile(profileId, {
+    const result = await updateProfile(profileId, {
       fullName: editState.fullName.trim(),
       email: editState.email.trim(),
       departmentId: editState.role === 'teacher' ? null : editState.departmentId,
@@ -110,7 +110,11 @@ export function EmployeeSettings() {
       jobTitle: resolveJobTitle(editState),
     })
     setEditingId(null)
-    addToast('success', 'Employee updated.')
+    if (result?.authError) {
+      addToast('error', result.authError)
+    } else {
+      addToast('success', 'Employee updated.')
+    }
   }
 
   function cancelEdit() {
@@ -175,7 +179,19 @@ export function EmployeeSettings() {
         },
       })
       if (error) {
-        setInviteError(error.message || 'Failed to send invite.')
+        // supabase.functions.invoke returns a generic message for non-2xx responses;
+        // the actual error details are in the response context.
+        let message = 'Failed to send invite.'
+        try {
+          const body = error.context ? await error.context.json() : null
+          if (body?.error) message = body.error
+        } catch {
+          // context parsing failed, fall back to error.message if meaningful
+          if (error.message && !error.message.includes('non-2xx')) {
+            message = error.message
+          }
+        }
+        setInviteError(message)
       } else if (data?.error) {
         setInviteError(data.error)
       } else {
