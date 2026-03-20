@@ -32,6 +32,12 @@ import type {
   PrintRequest,
   Company,
 } from './types'
+import { useToastStore } from '@/stores/toastStore'
+
+function showWriteError(operation: string, error: { message: string }) {
+  console.error(`${operation}:`, error)
+  useToastStore.getState().addToast('error', `Failed to save: ${error.message}`)
+}
 
 let _companyId: string | null = null
 
@@ -83,10 +89,25 @@ export async function fetchAllData() {
     supabase.from('companies').select('*').eq('id', getCompanyId()).single(),
   ])
 
-  // If any critical fetch fails, return null to fall back to mock data
-  if (tasksRes.error || profilesRes.error || periodsRes.error) {
-    console.error('Supabase fetch error:', tasksRes.error || profilesRes.error || periodsRes.error)
-    return null
+  // If any fetch fails, log all errors and return null to fall back to mock data
+  const errors = [
+    tasksRes.error && `tasks: ${tasksRes.error.message}`,
+    profilesRes.error && `profiles: ${profilesRes.error.message}`,
+    checklistsRes.error && `checklists: ${checklistsRes.error.message}`,
+    commentsRes.error && `comments: ${commentsRes.error.message}`,
+    assigneesRes.error && `assignees: ${assigneesRes.error.message}`,
+    taskDeptsRes.error && `taskDepts: ${taskDeptsRes.error.message}`,
+    periodsRes.error && `periods: ${periodsRes.error.message}`,
+    eventsRes.error && `events: ${eventsRes.error.message}`,
+    printRes.error && `print: ${printRes.error.message}`,
+  ].filter(Boolean)
+
+  if (errors.length > 0) {
+    console.error('Supabase fetch errors:', errors.join('; '))
+    // If core tables failed, return null entirely
+    if (tasksRes.error || profilesRes.error || periodsRes.error) {
+      return null
+    }
   }
 
   return {
@@ -115,25 +136,25 @@ export async function fetchAllData() {
 export async function insertTask(task: Task) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('tasks').insert(taskToRow({ ...task, companyId: getCompanyId() }))
-  if (error) console.error('insertTask:', error)
+  if (error) showWriteError('insertTask', error)
 }
 
 export async function updateTaskRow(taskId: string, updates: Partial<Task>) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('tasks').update(taskToRow(updates)).eq('id', taskId)
-  if (error) console.error('updateTask:', error)
+  if (error) showWriteError('updateTask', error)
 }
 
 export async function deleteTaskRow(taskId: string) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('tasks').delete().eq('id', taskId)
-  if (error) console.error('deleteTask:', error)
+  if (error) showWriteError('deleteTask', error)
 }
 
 export async function deleteTasksByPeriodRow(periodId: string) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('tasks').delete().eq('task_period_id', periodId)
-  if (error) console.error('deleteTasksByPeriod:', error)
+  if (error) showWriteError('deleteTasksByPeriod', error)
 }
 
 // ─── Checklist Items ─────────────────────────────────────────────────────────
@@ -141,19 +162,19 @@ export async function deleteTasksByPeriodRow(periodId: string) {
 export async function insertChecklistItem(item: ChecklistItem) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('checklist_items').insert(checklistItemToRow(item))
-  if (error) console.error('insertChecklistItem:', error)
+  if (error) showWriteError('insertChecklistItem', error)
 }
 
 export async function updateChecklistItemRow(itemId: string, updates: Partial<ChecklistItem>) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('checklist_items').update(checklistItemToRow(updates)).eq('id', itemId)
-  if (error) console.error('updateChecklistItem:', error)
+  if (error) showWriteError('updateChecklistItem', error)
 }
 
 export async function deleteChecklistItemRow(itemId: string) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('checklist_items').delete().eq('id', itemId)
-  if (error) console.error('deleteChecklistItem:', error)
+  if (error) showWriteError('deleteChecklistItem', error)
 }
 
 // ─── Assignees ────────────────────────────────────────────────────────────────
@@ -166,7 +187,7 @@ export async function insertAssignee(assignee: TaskAssignee) {
     profile_id: assignee.profileId,
     is_primary: assignee.isPrimary,
   })
-  if (error) console.error('insertAssignee:', error)
+  if (error) showWriteError('insertAssignee', error)
 }
 
 export async function deleteAssigneeRow(taskId: string, profileId: string) {
@@ -176,7 +197,7 @@ export async function deleteAssigneeRow(taskId: string, profileId: string) {
     .delete()
     .eq('task_id', taskId)
     .eq('profile_id', profileId)
-  if (error) console.error('deleteAssignee:', error)
+  if (error) showWriteError('deleteAssignee', error)
 }
 
 export async function updateAssigneeRow(taskId: string, profileId: string, isPrimary: boolean) {
@@ -186,7 +207,7 @@ export async function updateAssigneeRow(taskId: string, profileId: string, isPri
     .update({ is_primary: isPrimary })
     .eq('task_id', taskId)
     .eq('profile_id', profileId)
-  if (error) console.error('updateAssignee:', error)
+  if (error) showWriteError('updateAssignee', error)
 }
 
 // ─── Comments ─────────────────────────────────────────────────────────────────
@@ -199,13 +220,13 @@ export async function insertComment(comment: TaskComment) {
     profile_id: comment.profileId,
     content: comment.content,
   })
-  if (error) console.error('insertComment:', error)
+  if (error) showWriteError('insertComment', error)
 }
 
 export async function deleteCommentRow(commentId: string) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('task_comments').delete().eq('id', commentId)
-  if (error) console.error('deleteComment:', error)
+  if (error) showWriteError('deleteComment', error)
 }
 
 // ─── Task Departments ─────────────────────────────────────────────────────────
@@ -218,13 +239,13 @@ export async function insertTaskDepartment(td: TaskDepartment) {
     department_id: td.departmentId,
     role_description: td.roleDescription,
   })
-  if (error) console.error('insertTaskDepartment:', error)
+  if (error) showWriteError('insertTaskDepartment', error)
 }
 
 export async function deleteTaskDepartmentRow(tdId: string) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('task_departments').delete().eq('id', tdId)
-  if (error) console.error('deleteTaskDepartment:', error)
+  if (error) showWriteError('deleteTaskDepartment', error)
 }
 
 // ─── Profiles ─────────────────────────────────────────────────────────────────
@@ -232,7 +253,7 @@ export async function deleteTaskDepartmentRow(tdId: string) {
 export async function insertProfile(profile: Profile) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('profiles').insert(profileToRow({ ...profile, companyId: getCompanyId() }))
-  if (error) console.error('insertProfile:', error)
+  if (error) showWriteError('insertProfile', error)
 }
 
 export async function updateProfileRow(profileId: string, updates: Partial<Profile>): Promise<{ authError?: string }> {
@@ -255,14 +276,14 @@ export async function updateProfileRow(profileId: string, updates: Partial<Profi
   }
 
   const { error } = await supabase.from('profiles').update(profileToRow(updates)).eq('id', profileId)
-  if (error) console.error('updateProfile:', error)
+  if (error) showWriteError('updateProfile', error)
   return {}
 }
 
 export async function deleteProfileRow(profileId: string) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('profiles').delete().eq('id', profileId)
-  if (error) console.error('deleteProfile:', error)
+  if (error) showWriteError('deleteProfile', error)
 }
 
 // ─── Periods ──────────────────────────────────────────────────────────────────
@@ -277,7 +298,7 @@ export async function insertPeriod(period: TaskPeriod) {
     end_date: period.endDate,
     is_active: period.isActive,
   })
-  if (error) console.error('insertPeriod:', error)
+  if (error) showWriteError('insertPeriod', error)
 }
 
 export async function updatePeriodRow(periodId: string, updates: Partial<TaskPeriod>) {
@@ -288,13 +309,13 @@ export async function updatePeriodRow(periodId: string, updates: Partial<TaskPer
   if (updates.endDate !== undefined) row.end_date = updates.endDate
   if (updates.isActive !== undefined) row.is_active = updates.isActive
   const { error } = await supabase.from('task_periods').update(row).eq('id', periodId)
-  if (error) console.error('updatePeriod:', error)
+  if (error) showWriteError('updatePeriod', error)
 }
 
 export async function deletePeriodRow(periodId: string) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('task_periods').delete().eq('id', periodId)
-  if (error) console.error('deletePeriod:', error)
+  if (error) showWriteError('deletePeriod', error)
 }
 
 // ─── Calendar Events ──────────────────────────────────────────────────────────
@@ -311,7 +332,7 @@ export async function insertCalendarEvent(event: CalendarEvent) {
     end_date: event.endDate ?? null,
     related_task_id: event.relatedTaskId ?? null,
   })
-  if (error) console.error('insertCalendarEvent:', error)
+  if (error) showWriteError('insertCalendarEvent', error)
 }
 
 export async function updateCalendarEventRow(eventId: string, updates: Partial<CalendarEvent>) {
@@ -324,13 +345,13 @@ export async function updateCalendarEventRow(eventId: string, updates: Partial<C
   if (updates.endDate !== undefined) row.end_date = updates.endDate
   if (updates.relatedTaskId !== undefined) row.related_task_id = updates.relatedTaskId
   const { error } = await supabase.from('calendar_events').update(row).eq('id', eventId)
-  if (error) console.error('updateCalendarEvent:', error)
+  if (error) showWriteError('updateCalendarEvent', error)
 }
 
 export async function deleteCalendarEventRow(eventId: string) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('calendar_events').delete().eq('id', eventId)
-  if (error) console.error('deleteCalendarEvent:', error)
+  if (error) showWriteError('deleteCalendarEvent', error)
 }
 
 // ─── Print Requests ───────────────────────────────────────────────────────────
@@ -338,19 +359,19 @@ export async function deleteCalendarEventRow(eventId: string) {
 export async function insertPrintRequest(pr: PrintRequest) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('print_requests').insert(printRequestToRow({ ...pr, companyId: getCompanyId() }))
-  if (error) console.error('insertPrintRequest:', error)
+  if (error) showWriteError('insertPrintRequest', error)
 }
 
 export async function updatePrintRequestRow(id: string, updates: Partial<PrintRequest>) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('print_requests').update(printRequestToRow(updates)).eq('id', id)
-  if (error) console.error('updatePrintRequest:', error)
+  if (error) showWriteError('updatePrintRequest', error)
 }
 
 export async function deletePrintRequestRow(id: string) {
   if (!isSupabaseConfigured()) return
   const { error } = await supabase.from('print_requests').delete().eq('id', id)
-  if (error) console.error('deletePrintRequest:', error)
+  if (error) showWriteError('deletePrintRequest', error)
 }
 
 // ─── Company ──────────────────────────────────────────────────────────────────
@@ -362,5 +383,5 @@ export async function updateCompanyRow(updates: Partial<Company>) {
   if (updates.schoolYear !== undefined) row.school_year = updates.schoolYear
   if (updates.description !== undefined) row.description = updates.description
   const { error } = await supabase.from('companies').update(row).eq('id', getCompanyId())
-  if (error) console.error('updateCompany:', error)
+  if (error) showWriteError('updateCompany', error)
 }

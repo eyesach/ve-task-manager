@@ -187,6 +187,8 @@ export function useRealtimeSync() {
           const p = payload as unknown as { eventType: string } & Payload
           if (payload.eventType === 'INSERT') {
             taskStore().applyRealtimeAssigneeInsert(mapAssignee(p.new))
+          } else if (payload.eventType === 'UPDATE') {
+            taskStore().applyRealtimeAssigneeUpdate(p.new.id as string, mapAssignee(p.new))
           } else if (payload.eventType === 'DELETE') {
             taskStore().applyRealtimeAssigneeDelete(p.old.id as string)
           }
@@ -199,6 +201,8 @@ export function useRealtimeSync() {
           const p = payload as unknown as { eventType: string } & Payload
           if (payload.eventType === 'INSERT') {
             taskStore().applyRealtimeCommentInsert(mapComment(p.new))
+          } else if (payload.eventType === 'UPDATE') {
+            taskStore().applyRealtimeCommentUpdate(p.new.id as string, mapComment(p.new))
           } else if (payload.eventType === 'DELETE') {
             taskStore().applyRealtimeCommentDelete(p.old.id as string)
           }
@@ -209,14 +213,17 @@ export function useRealtimeSync() {
         { event: '*', schema: 'public', table: 'task_departments' },
         (payload) => {
           const p = payload as unknown as { eventType: string } & Payload
-          // task_departments are managed via addTaskDepartment / removeTaskDepartment
-          // but we still apply inserts/deletes from realtime for multi-user sync
           if (payload.eventType === 'INSERT') {
             const td = mapTaskDepartment(p.new)
             useTaskStore.setState((s) => ({
               taskDepartments: s.taskDepartments.some((x) => x.id === td.id)
                 ? s.taskDepartments
                 : [...s.taskDepartments, td],
+            }))
+          } else if (payload.eventType === 'UPDATE') {
+            const td = mapTaskDepartment(p.new)
+            useTaskStore.setState((s) => ({
+              taskDepartments: s.taskDepartments.map((x) => (x.id === td.id ? td : x)),
             }))
           } else if (payload.eventType === 'DELETE') {
             useTaskStore.setState((s) => ({

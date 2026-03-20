@@ -86,9 +86,12 @@ export function EmployeeSettings() {
       addToast('error', 'Name is required.')
       return
     }
+    const original = profiles.find((p) => p.id === profileId)
+    const trimmedEmail = editState.email.trim()
+    const emailChanged = trimmedEmail !== (original?.email ?? '')
     const result = await updateProfile(profileId, {
       fullName: editState.fullName.trim(),
-      email: editState.email.trim(),
+      ...(emailChanged ? { email: trimmedEmail } : {}),
       departmentId: editState.role === 'teacher' ? null : editState.departmentId,
       role: editState.role,
       jobTitle: resolveJobTitle(editState),

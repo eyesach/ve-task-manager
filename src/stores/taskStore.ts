@@ -108,8 +108,10 @@ interface TaskState {
   applyRealtimeChecklistUpdate: (itemId: string, updates: Partial<ChecklistItem>) => void
   applyRealtimeChecklistDelete: (itemId: string) => void
   applyRealtimeAssigneeInsert: (assignee: TaskAssignee) => void
+  applyRealtimeAssigneeUpdate: (assigneeId: string, updates: Partial<TaskAssignee>) => void
   applyRealtimeAssigneeDelete: (assigneeId: string) => void
   applyRealtimeCommentInsert: (comment: TaskComment) => void
+  applyRealtimeCommentUpdate: (commentId: string, updates: Partial<TaskComment>) => void
   applyRealtimeCommentDelete: (commentId: string) => void
   applyRealtimeProfileInsert: (profile: Profile) => void
   applyRealtimeProfileUpdate: (profileId: string, updates: Partial<Profile>) => void
@@ -419,6 +421,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       assignees: s.assignees.some((a) => a.id === assignee.id) ? s.assignees : [...s.assignees, assignee],
     })),
 
+  applyRealtimeAssigneeUpdate: (assigneeId: string, updates: Partial<TaskAssignee>) =>
+    set((s) => ({
+      assignees: s.assignees.map((a) => (a.id === assigneeId ? { ...a, ...updates } : a)),
+    })),
+
   applyRealtimeAssigneeDelete: (assigneeId) =>
     set((s) => ({
       assignees: s.assignees.filter((a) => a.id !== assigneeId),
@@ -427,6 +434,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   applyRealtimeCommentInsert: (comment) =>
     set((s) => ({
       comments: s.comments.some((cm) => cm.id === comment.id) ? s.comments : [...s.comments, comment],
+    })),
+
+  applyRealtimeCommentUpdate: (commentId: string, updates: Partial<TaskComment>) =>
+    set((s) => ({
+      comments: s.comments.map((cm) => (cm.id === commentId ? { ...cm, ...updates } : cm)),
     })),
 
   applyRealtimeCommentDelete: (commentId) =>
