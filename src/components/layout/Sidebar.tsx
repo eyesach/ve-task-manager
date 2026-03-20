@@ -28,7 +28,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
   const { profile, signOut } = useAuth()
 
-  const isTeacherOrAdmin = profile?.role === 'teacher' || profile?.role === 'admin'
+  const isTeacherOrAdmin = profile?.role === 'teacher' || profile?.role === 'admin' || profile?.role === 'creator'
 
   const visibleSpecialSections = SPECIAL_SECTIONS.filter(
     (section) => section.path !== '/settings' || isTeacherOrAdmin

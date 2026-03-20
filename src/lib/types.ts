@@ -20,7 +20,7 @@ export interface Profile {
   departmentId: string | null
   fullName: string
   email: string
-  role: 'admin' | 'department_lead' | 'member' | 'teacher'
+  role: 'admin' | 'department_lead' | 'member' | 'teacher' | 'creator'
   jobTitle?: string
   avatarUrl?: string
 }

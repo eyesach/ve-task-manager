@@ -8,7 +8,7 @@ export function usePermissions() {
   const userDeptId = profile?.departmentId
   const userId = profile?.id
 
-  const isTeacherOrAdmin = role === 'teacher' || role === 'admin'
+  const isTeacherOrAdmin = role === 'teacher' || role === 'admin' || role === 'creator'
   const isDeptLead = role === 'department_lead'
 
   function canCreateTask(departmentId?: string): boolean {

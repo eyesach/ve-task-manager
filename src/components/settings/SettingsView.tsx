@@ -5,18 +5,22 @@ import { EmployeeSettings } from './EmployeeSettings'
 import { DepartmentSettings } from './DepartmentSettings'
 import { PeriodSettings } from './PeriodSettings'
 import { CompanySettings } from './CompanySettings'
+import { AccountSettings } from './AccountSettings'
+import { TrelloImportSettings } from './TrelloImportSettings'
 
 const TABS = [
+  { id: 'account', label: 'Account' },
   { id: 'employees', label: 'Employees' },
   { id: 'departments', label: 'Departments' },
   { id: 'periods', label: 'Periods' },
   { id: 'company', label: 'Company' },
+  { id: 'import', label: 'Import' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
 
 export function SettingsView() {
-  const [activeTab, setActiveTab] = useState<TabId>('employees')
+  const [activeTab, setActiveTab] = useState<TabId>('account')
   const { signOut } = useAuth()
 
   return (
@@ -55,10 +59,12 @@ export function SettingsView() {
 
       {/* Tab Content */}
       <div>
+        {activeTab === 'account' && <AccountSettings />}
         {activeTab === 'employees' && <EmployeeSettings />}
         {activeTab === 'departments' && <DepartmentSettings />}
         {activeTab === 'periods' && <PeriodSettings />}
         {activeTab === 'company' && <CompanySettings />}
+        {activeTab === 'import' && <TrelloImportSettings />}
       </div>
     </div>
   )

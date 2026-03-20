@@ -15,6 +15,7 @@ const ROLES: { value: Profile['role']; label: string }[] = [
   { value: 'department_lead', label: 'Department Lead' },
   { value: 'member', label: 'Member' },
   { value: 'teacher', label: 'Teacher' },
+  { value: 'creator', label: 'Creator' },
 ]
 
 interface EditState {
@@ -170,12 +171,25 @@ export function EmployeeSettings() {
     setInviteLoading(true)
     setInviteError(null)
     try {
+      // Get the current session token explicitly — supabase.functions.invoke
+      // should auto-attach it, but we pass it manually as a fallback.
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData.session?.access_token
+      if (!accessToken) {
+        setInviteError('You are not logged in. Please sign in and try again.')
+        setInviteLoading(false)
+        return
+      }
+
       const { data, error } = await supabase.functions.invoke('invite-user', {
         body: {
           email: inviteForm.email.trim(),
           full_name: inviteForm.fullName.trim(),
           department_id: inviteForm.role === 'teacher' ? null : inviteForm.departmentId,
           role: inviteForm.role,
+        },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
         },
       })
       if (error) {

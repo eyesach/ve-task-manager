@@ -37,6 +37,7 @@ export function useRealtimeSync() {
   const companyId = profile?.companyId ?? null
   const channelRef = useRef<RealtimeChannel | null>(null)
   const hasConnectedOnce = useRef(false)
+  const lastErrorToast = useRef(0)
 
   useEffect(() => {
     if (!companyId) return
@@ -226,8 +227,13 @@ export function useRealtimeSync() {
       )
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') {
-          console.error('Realtime channel error')
-          useToastStore.getState().addToast('error', 'Realtime connection error. Some updates may be delayed.')
+          console.warn('Realtime channel error')
+          // Throttle error toasts to at most once per 30 seconds
+          const now = Date.now()
+          if (now - lastErrorToast.current > 30_000) {
+            lastErrorToast.current = now
+            useToastStore.getState().addToast('error', 'Realtime connection error. Some updates may be delayed.')
+          }
         }
         if (status === 'SUBSCRIBED') {
           if (hasConnectedOnce.current) {
