@@ -150,6 +150,9 @@ export function transformTrelloBoard(
     if (m.departmentAbbr) listToDept.set(m.trelloListId, m.departmentAbbr)
   }
 
+  // Track codes generated during this transform so each card gets a unique code
+  const generatedCodeCounts = new Map<string, number>()
+
   const openCards = board.cards.filter((c) => !c.closed)
 
   for (const card of openCards) {
@@ -170,20 +173,33 @@ export function transformTrelloBoard(
       continue
     }
 
-    const taskCode = getNextTaskCode(deptAbbr, periodNumber)
+    // Get the base code from the store (accounts for existing tasks),
+    // then offset by how many codes we've already generated for this dept
+    const deptKey = `${deptAbbr}-${periodNumber}`
+    const alreadyGenerated = generatedCodeCounts.get(deptKey) ?? 0
+    // On the first call getNextTaskCode returns the correct next code,
+    // but subsequent calls during the same transform still see the same store state.
+    // So: call once per dept to get the base, then increment locally.
+    let taskCode: string
+    if (alreadyGenerated === 0) {
+      taskCode = getNextTaskCode(deptAbbr, periodNumber)
+    } else {
+      // Parse the base code's sequence and add the offset
+      const baseCode = getNextTaskCode(deptAbbr, periodNumber)
+      const prefix = `${deptAbbr} ${periodNumber}.`
+      const baseSeq = parseInt(baseCode.slice(prefix.length), 10)
+      taskCode = `${prefix}${baseSeq + alreadyGenerated}`
+    }
+    generatedCodeCounts.set(deptKey, alreadyGenerated + 1)
     const taskId = crypto.randomUUID()
     const now = new Date().toISOString()
 
-    // Build description: card desc + attachment links
-    let description = card.desc || ''
-    if (card.attachments?.length) {
-      const links = card.attachments
-        .map((a) => `- [${a.name || a.url}](${a.url})`)
-        .join('\n')
-      description = description
-        ? `${description}\n\n**Attachments:**\n${links}`
-        : `**Attachments:**\n${links}`
-    }
+    // Build description and attachments
+    const description = card.desc || ''
+    const attachments = (card.attachments ?? []).map((a) => ({
+      name: a.name || a.url,
+      url: a.url,
+    }))
 
     const task: Task = {
       id: taskId,
@@ -193,6 +209,7 @@ export function transformTrelloBoard(
       taskCode,
       title: card.name.trim(),
       description: description || undefined,
+      attachments: attachments.length > 0 ? attachments : undefined,
       category: 'department',
       priority: 'normal',
       status: card.dueComplete ? 'completed' : 'not_started',

@@ -23,6 +23,7 @@ import {
   insertTask,
   updateTaskRow,
   deleteTaskRow,
+  deleteTasksByPeriodRow,
   insertChecklistItem as dbInsertChecklist,
   updateChecklistItemRow,
   deleteChecklistItemRow,
@@ -68,6 +69,7 @@ interface TaskState {
   addTask: (task: Task) => void
   updateTask: (taskId: string, updates: Partial<Task>) => void
   deleteTask: (taskId: string) => void
+  deleteTasksByPeriod: (periodId: string) => void
 
   // --- Assignee CRUD ---
   addAssignee: (taskId: string, profileId: string, isPrimary: boolean) => void
@@ -207,6 +209,18 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       taskDepartments: s.taskDepartments.filter((td) => td.taskId !== taskId),
     }))
     deleteTaskRow(taskId)
+  },
+
+  deleteTasksByPeriod: (periodId) => {
+    const taskIds = get().tasks.filter((t) => t.taskPeriodId === periodId).map((t) => t.id)
+    set((s) => ({
+      tasks: s.tasks.filter((t) => t.taskPeriodId !== periodId),
+      checklists: s.checklists.filter((c) => !taskIds.includes(c.taskId)),
+      assignees: s.assignees.filter((a) => !taskIds.includes(a.taskId)),
+      comments: s.comments.filter((cm) => !taskIds.includes(cm.taskId)),
+      taskDepartments: s.taskDepartments.filter((td) => !taskIds.includes(td.taskId)),
+    }))
+    deleteTasksByPeriodRow(periodId)
   },
 
   // ─── Assignee CRUD ──────────────────────────────────────────────────────────

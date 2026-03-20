@@ -130,6 +130,12 @@ export async function deleteTaskRow(taskId: string) {
   if (error) console.error('deleteTask:', error)
 }
 
+export async function deleteTasksByPeriodRow(periodId: string) {
+  if (!isSupabaseConfigured()) return
+  const { error } = await supabase.from('tasks').delete().eq('task_period_id', periodId)
+  if (error) console.error('deleteTasksByPeriod:', error)
+}
+
 // ─── Checklist Items ─────────────────────────────────────────────────────────
 
 export async function insertChecklistItem(item: ChecklistItem) {

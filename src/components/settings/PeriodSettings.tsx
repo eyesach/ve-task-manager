@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Pencil, Trash2, Plus, Check, X, Radio } from 'lucide-react'
+import { Pencil, Trash2, Plus, Check, X, Radio, Eraser } from 'lucide-react'
 import { usePeriodStore } from '@/stores/periodStore'
+import { useTaskStore } from '@/stores/taskStore'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { useToastStore } from '@/stores/toastStore'
 import { usePermissions } from '@/hooks/usePermissions'
@@ -28,12 +29,15 @@ export function PeriodSettings() {
   const deletePeriod = usePeriodStore((s) => s.deletePeriod)
   const addToast = useToastStore((s) => s.addToast)
   const { canManageSettings } = usePermissions()
+  const tasks = useTaskStore((s) => s.tasks)
+  const deleteTasksByPeriod = useTaskStore((s) => s.deleteTasksByPeriod)
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editState, setEditState] = useState<PeriodEditState>(emptyPeriod())
   const [showAddForm, setShowAddForm] = useState(false)
   const [newPeriod, setNewPeriod] = useState<PeriodEditState>(emptyPeriod())
   const [deleteTarget, setDeleteTarget] = useState<TaskPeriod | null>(null)
+  const [purgeTarget, setPurgeTarget] = useState<TaskPeriod | null>(null)
 
   const sortedPeriods = [...periods].sort((a, b) => a.startDate.localeCompare(b.startDate))
 
@@ -215,6 +219,13 @@ export function PeriodSettings() {
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
                         <button
+                          onClick={() => setPurgeTarget(period)}
+                          className="rounded p-1 text-text-tertiary hover:bg-surface-3 hover:text-red-500"
+                          title="Delete all tasks in this period"
+                        >
+                          <Eraser className="h-3.5 w-3.5" />
+                        </button>
+                        <button
                           onClick={() => setDeleteTarget(period)}
                           className="rounded p-1 text-text-tertiary hover:bg-surface-3 hover:text-red-500"
                           title="Delete"
@@ -296,6 +307,22 @@ export function PeriodSettings() {
         title="Delete Period"
         message={`Delete "${deleteTarget?.name ?? 'this period'}"? Tasks referencing this period will not be deleted but may become orphaned.`}
         confirmLabel="Delete"
+      />
+
+      <ConfirmDialog
+        open={purgeTarget !== null}
+        onClose={() => setPurgeTarget(null)}
+        onConfirm={() => {
+          if (purgeTarget) {
+            const count = tasks.filter((t) => t.taskPeriodId === purgeTarget.id).length
+            deleteTasksByPeriod(purgeTarget.id)
+            addToast('success', `Deleted ${count} task${count !== 1 ? 's' : ''} from ${purgeTarget.name}.`)
+            setPurgeTarget(null)
+          }
+        }}
+        title="Delete All Tasks in Period"
+        message={`Delete ALL ${tasks.filter((t) => t.taskPeriodId === purgeTarget?.id).length} tasks in "${purgeTarget?.name ?? 'this period'}"? This includes all checklists, assignees, comments, and department links. This cannot be undone.`}
+        confirmLabel="Delete All Tasks"
       />
     </div>
   )

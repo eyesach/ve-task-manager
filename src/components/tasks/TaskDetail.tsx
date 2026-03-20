@@ -11,6 +11,9 @@ import {
   Trash2,
   Star,
   ArrowRight,
+  Link,
+  Plus,
+  ExternalLink,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useUIStore } from '@/stores/uiStore'
@@ -22,7 +25,7 @@ import {
   TASK_PRIORITIES,
   TASK_CATEGORIES,
 } from '@/lib/constants'
-import type { TaskPriority, TaskCategory } from '@/lib/types'
+import type { TaskPriority, TaskCategory, TaskAttachment } from '@/lib/types'
 import { StatusChip } from '@/components/common/StatusChip'
 import { Avatar } from '@/components/common/AvatarGroup'
 import { TaskChecklist } from './TaskChecklist'
@@ -59,6 +62,8 @@ export function TaskDetail() {
   const [editDueDate, setEditDueDate] = useState('')
   const [editResponsibility, setEditResponsibility] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [newAttachmentName, setNewAttachmentName] = useState('')
+  const [newAttachmentUrl, setNewAttachmentUrl] = useState('')
 
   // Reset edit state when switching tasks
   useEffect(() => {
@@ -174,6 +179,25 @@ export function TaskDetail() {
     return allAssignees.find(
       (a) => a.taskId === task?.id && a.profileId === profileId
     )
+  }
+
+  function handleAddAttachment() {
+    if (!task || !newAttachmentUrl.trim()) return
+    const attachment: TaskAttachment = {
+      name: newAttachmentName.trim() || newAttachmentUrl.trim(),
+      url: newAttachmentUrl.trim(),
+    }
+    const current = task.attachments ?? []
+    updateTask(task.id, { attachments: [...current, attachment] })
+    setNewAttachmentName('')
+    setNewAttachmentUrl('')
+  }
+
+  function handleRemoveAttachment(index: number) {
+    if (!task) return
+    const current = [...(task.attachments ?? [])]
+    current.splice(index, 1)
+    updateTask(task.id, { attachments: current })
   }
 
   const inputCls =
@@ -425,6 +449,74 @@ export function TaskDetail() {
                   </p>
                 ) : (
                   <p className="text-sm italic text-text-tertiary">No description</p>
+                )}
+              </div>
+
+              {/* Attachments */}
+              <div className="border-b border-border-subtle p-5">
+                <label className="mb-2 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-text-tertiary">
+                  <Link size={10} /> Attachments
+                </label>
+                {(task.attachments ?? []).length > 0 ? (
+                  <div className="mb-3 space-y-1.5">
+                    {(task.attachments ?? []).map((att, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-2 rounded-md border border-border-subtle bg-surface-2 px-3 py-1.5 text-sm"
+                      >
+                        <ExternalLink size={13} className="shrink-0 text-accent" />
+                        <a
+                          href={att.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 truncate text-accent hover:underline"
+                          title={att.url}
+                        >
+                          {att.name}
+                        </a>
+                        {canEdit && (
+                          <button
+                            onClick={() => handleRemoveAttachment(i)}
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-text-tertiary transition-colors hover:bg-surface-3 hover:text-red-500"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mb-3 text-sm text-text-tertiary">No attachments</p>
+                )}
+                {canEdit && (
+                  <div className="flex flex-col gap-2">
+                    <input
+                      type="text"
+                      value={newAttachmentName}
+                      onChange={(e) => setNewAttachmentName(e.target.value)}
+                      placeholder="Label (optional)"
+                      className={inputCls + ' w-full'}
+                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={newAttachmentUrl}
+                        onChange={(e) => setNewAttachmentUrl(e.target.value)}
+                        placeholder="https://..."
+                        className={inputCls + ' flex-1'}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleAddAttachment()
+                        }}
+                      />
+                      <button
+                        onClick={handleAddAttachment}
+                        disabled={!newAttachmentUrl.trim()}
+                        className="flex h-8 items-center gap-1 rounded-md bg-accent px-2.5 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-40"
+                      >
+                        <Plus size={13} /> Add
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
 

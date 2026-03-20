@@ -39,6 +39,11 @@ export type TaskStatus = 'not_started' | 'in_progress' | 'in_review' | 'complete
 export type TaskPriority = 'low' | 'normal' | 'high' | 'critical'
 export type EvidenceType = 'text' | 'link' | 'date' | 'teacher_observation' | 'file'
 
+export interface TaskAttachment {
+  name: string
+  url: string
+}
+
 export interface Task {
   id: string
   companyId: string
@@ -47,6 +52,7 @@ export interface Task {
   taskCode: string
   title: string
   description?: string
+  attachments?: TaskAttachment[]
   category: TaskCategory
   priority: TaskPriority
   status: TaskStatus

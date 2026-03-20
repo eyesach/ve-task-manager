@@ -2,6 +2,7 @@
 
 import type {
   Task,
+  TaskAttachment,
   Profile,
   ChecklistItem,
   TaskComment,
@@ -23,6 +24,9 @@ export function mapTask(row: Record<string, unknown>): Task {
     taskCode: row.task_code as string,
     title: row.title as string,
     description: row.description as string | undefined,
+    attachments: Array.isArray(row.attachments)
+      ? (row.attachments as TaskAttachment[])
+      : undefined,
     category: row.category as Task['category'],
     priority: row.priority as Task['priority'],
     status: row.status as Task['status'],
@@ -150,6 +154,7 @@ export function taskToRow(task: Partial<Task>): Record<string, unknown> {
   if (task.taskCode !== undefined) row.task_code = task.taskCode
   if (task.title !== undefined) row.title = task.title
   if (task.description !== undefined) row.description = task.description
+  if (task.attachments !== undefined) row.attachments = task.attachments
   if (task.category !== undefined) row.category = task.category
   if (task.priority !== undefined) row.priority = task.priority
   if (task.status !== undefined) row.status = task.status
