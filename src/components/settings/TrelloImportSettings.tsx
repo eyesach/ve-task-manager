@@ -4,6 +4,7 @@ import { useTaskStore } from '@/stores/taskStore'
 import { usePeriodStore } from '@/stores/periodStore'
 import { useToastStore } from '@/stores/toastStore'
 import { DEPARTMENTS } from '@/lib/constants'
+import { insertTask, insertChecklistItem } from '@/lib/supabaseService'
 import {
   validateTrelloExport,
   buildListMappings,
@@ -30,8 +31,6 @@ export function TrelloImportSettings() {
 
   const periods = usePeriodStore((s) => s.periods)
   const activePeriodId = usePeriodStore((s) => s.activePeriodId)
-  const addTask = useTaskStore((s) => s.addTask)
-  const addChecklistItem = useTaskStore((s) => s.addChecklistItem)
   const getNextTaskCode = useTaskStore((s) => s.getNextTaskCode)
   const addToast = useToastStore((s) => s.addToast)
 
@@ -91,15 +90,22 @@ export function TrelloImportSettings() {
     setImporting(true)
     setImportProgress(0)
 
+    const addTaskLocal = useTaskStore.getState().addTaskLocal
+    const addChecklistItemLocal = useTaskStore.getState().addChecklistItemLocal
+
     let succeeded = 0
     let failed = 0
 
     for (let i = 0; i < preview.tasks.length; i++) {
       const { task, checklists } = preview.tasks[i]!
       try {
-        addTask(task)
+        // Add to local store immediately for optimistic UI
+        addTaskLocal(task)
+        // Await the Supabase insert so the row exists before checklist inserts
+        await insertTask(task)
         for (const item of checklists) {
-          addChecklistItem(item)
+          addChecklistItemLocal(item)
+          await insertChecklistItem(item)
         }
         succeeded++
       } catch (err) {
@@ -119,7 +125,7 @@ export function TrelloImportSettings() {
     } else {
       addToast('error', `Imported ${succeeded} tasks, ${failed} failed.`)
     }
-  }, [preview, addTask, addChecklistItem, addToast])
+  }, [preview, addToast])
 
   // ─── Reset wizard ───────────────────────────────────────────────────────────
 

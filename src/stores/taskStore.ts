@@ -67,6 +67,7 @@ interface TaskState {
 
   // --- Task CRUD ---
   addTask: (task: Task) => void
+  addTaskLocal: (task: Task) => void
   updateTask: (taskId: string, updates: Partial<Task>) => void
   deleteTask: (taskId: string) => void
   deleteTasksByPeriod: (periodId: string) => void
@@ -78,6 +79,7 @@ interface TaskState {
 
   // --- Checklist CRUD ---
   addChecklistItem: (item: ChecklistItem) => void
+  addChecklistItemLocal: (item: ChecklistItem) => void
   updateChecklistItem: (itemId: string, updates: Partial<ChecklistItem>) => void
   deleteChecklistItem: (itemId: string) => void
   reorderChecklistItem: (itemId: string, direction: 'up' | 'down') => void
@@ -193,6 +195,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     insertTask(task)
   },
 
+  addTaskLocal: (task) => {
+    set((s) => ({ tasks: [...s.tasks, task] }))
+  },
+
   updateTask: (taskId, updates) => {
     set((s) => ({
       tasks: s.tasks.map((t) =>
@@ -260,6 +266,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   addChecklistItem: (item) => {
     set((s) => ({ checklists: [...s.checklists, item] }))
     dbInsertChecklist(item)
+  },
+
+  addChecklistItemLocal: (item) => {
+    set((s) => ({ checklists: [...s.checklists, item] }))
   },
 
   updateChecklistItem: (itemId, updates) => {
@@ -357,12 +367,21 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     return await updateProfileRow(profileId, updates)
   },
 
-  deleteProfile: (profileId) => {
+  deleteProfile: async (profileId) => {
     set((s) => ({
       profiles: s.profiles.filter((p) => p.id !== profileId),
       assignees: s.assignees.filter((a) => a.profileId !== profileId),
     }))
-    deleteProfileRow(profileId)
+    // Use the delete-user Edge Function to remove both the profile and auth user.
+    // This frees the email for re-signup via the join link.
+    const { supabase } = await import('@/lib/supabase')
+    const { error } = await supabase.functions.invoke('delete-user', {
+      body: { user_id: profileId },
+    })
+    if (error) {
+      console.error('delete-user Edge Function failed, falling back to profile-only delete:', error)
+      deleteProfileRow(profileId)
+    }
   },
 
   // ─── Task code helper ────────────────────────────────────────────────────────

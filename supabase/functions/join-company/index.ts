@@ -48,28 +48,65 @@ serve(async (req) => {
       )
     }
 
-    // Create auth user
+    // Try to create auth user
+    let userId: string
+
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
     })
 
-    if (createError || !newUser.user) {
-      const message = createError?.message ?? 'Failed to create account'
-      // Make "already registered" error more user-friendly
-      const friendly = message.includes('already been registered')
-        ? 'An account with this email already exists. Try signing in instead.'
-        : message
-      return new Response(
-        JSON.stringify({ error: friendly }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    if (createError) {
+      // If the email is already registered, check if it's an orphaned auth user
+      // (profile was deleted but auth user was not — e.g. deleted before the
+      // delete-user Edge Function existed).
+      if (createError.message?.includes('already been registered')) {
+        const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+        const existingUser = !listError
+          ? users?.find((u: { email?: string }) => u.email === email)
+          : null
+
+        if (existingUser) {
+          // Check if they have a profile — if they do, they're a real existing user
+          const { data: existingProfile } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('id', existingUser.id)
+            .single()
+
+          if (existingProfile) {
+            return new Response(
+              JSON.stringify({ error: 'An account with this email already exists. Try signing in instead.' }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+
+          // Orphaned auth user — update their password and reuse
+          await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+            password,
+            email_confirm: true,
+          })
+          userId = existingUser.id
+        } else {
+          return new Response(
+            JSON.stringify({ error: 'An account with this email already exists. Try signing in instead.' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      } else {
+        return new Response(
+          JSON.stringify({ error: createError.message ?? 'Failed to create account' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    } else {
+      userId = newUser.user!.id
     }
 
     // Create profile with member role, no department (admin assigns later)
     const { error: insertError } = await supabaseAdmin.from('profiles').insert({
-      id: newUser.user.id,
+      id: userId,
       company_id: company.id,
       department_id: null,
       full_name: full_name.trim(),
@@ -78,8 +115,10 @@ serve(async (req) => {
     })
 
     if (insertError) {
-      // Cleanup: delete the auth user if profile creation fails
-      await supabaseAdmin.auth.admin.deleteUser(newUser.user.id)
+      // Cleanup: delete the auth user if profile creation fails (only if we just created it)
+      if (newUser?.user) {
+        await supabaseAdmin.auth.admin.deleteUser(userId)
+      }
       return new Response(
         JSON.stringify({ error: `Account setup failed: ${insertError.message}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
