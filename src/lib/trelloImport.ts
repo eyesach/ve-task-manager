@@ -94,8 +94,11 @@ export function extractPeriodNumber(periodName: string): number {
 export interface ListMapping {
   trelloListId: string
   trelloListName: string
-  departmentAbbr: string | null  // null = skip
+  departmentAbbr: string | null  // null = skip, 'ID' = inter-department
   cardCount: number
+  // Inter-department fields (only used when departmentAbbr === 'ID')
+  involvedDepartments?: string[]   // abbreviations of all involved departments
+  headDepartmentAbbr?: string      // the lead/head department abbreviation
 }
 
 export interface ImportTaskPreview {
@@ -144,10 +147,14 @@ export function transformTrelloBoard(
     checklistsByCard.set(cl.idCard, existing)
   }
 
-  // Build a map from list ID → department abbreviation
+  // Build a map from list ID → department abbreviation + inter-dept info
   const listToDept = new Map<string, string>()
+  const listToMapping = new Map<string, ListMapping>()
   for (const m of mappings) {
-    if (m.departmentAbbr) listToDept.set(m.trelloListId, m.departmentAbbr)
+    if (m.departmentAbbr) {
+      listToDept.set(m.trelloListId, m.departmentAbbr)
+      listToMapping.set(m.trelloListId, m)
+    }
   }
 
   // Track codes generated during this transform so each card gets a unique code
@@ -167,26 +174,34 @@ export function transformTrelloBoard(
     }
 
     const warnings: string[] = []
-    const deptId = DEPT_IDS[deptAbbr as keyof typeof DEPT_IDS]
+    const mapping = listToMapping.get(card.idList)!
+    const isInterDept = deptAbbr === 'ID'
+
+    // For inter-department tasks, use the head department for the task code and departmentId
+    const effectiveAbbr = isInterDept ? (mapping.headDepartmentAbbr ?? 'AD') : deptAbbr
+    const deptId = DEPT_IDS[effectiveAbbr as keyof typeof DEPT_IDS]
     if (!deptId) {
-      skippedCards.push({ name: card.name, reason: `Unknown department abbreviation: ${deptAbbr}` })
+      skippedCards.push({ name: card.name, reason: `Unknown department abbreviation: ${effectiveAbbr}` })
       continue
     }
 
+    // For inter-dept tasks, use 'ID' as the code prefix; otherwise use the department abbreviation
+    const codeAbbr = isInterDept ? 'ID' : deptAbbr
+
     // Get the base code from the store (accounts for existing tasks),
     // then offset by how many codes we've already generated for this dept
-    const deptKey = `${deptAbbr}-${periodNumber}`
+    const deptKey = `${codeAbbr}-${periodNumber}`
     const alreadyGenerated = generatedCodeCounts.get(deptKey) ?? 0
     // On the first call getNextTaskCode returns the correct next code,
     // but subsequent calls during the same transform still see the same store state.
     // So: call once per dept to get the base, then increment locally.
     let taskCode: string
     if (alreadyGenerated === 0) {
-      taskCode = getNextTaskCode(deptAbbr, periodNumber)
+      taskCode = getNextTaskCode(codeAbbr, periodNumber)
     } else {
       // Parse the base code's sequence and add the offset
-      const baseCode = getNextTaskCode(deptAbbr, periodNumber)
-      const prefix = `${deptAbbr} ${periodNumber}.`
+      const baseCode = getNextTaskCode(codeAbbr, periodNumber)
+      const prefix = `${codeAbbr} ${periodNumber}.`
       const baseSeq = parseInt(baseCode.slice(prefix.length), 10)
       taskCode = `${prefix}${baseSeq + alreadyGenerated}`
     }
@@ -205,12 +220,12 @@ export function transformTrelloBoard(
       id: taskId,
       companyId: COMPANY_ID,
       taskPeriodId: targetPeriodId,
-      departmentId: deptId,
+      departmentId: isInterDept ? null : deptId,
       taskCode,
       title: card.name.trim(),
       description: description || undefined,
       attachments: attachments.length > 0 ? attachments : undefined,
-      category: 'department',
+      category: isInterDept ? 'inter_department' : 'department',
       priority: 'normal',
       status: card.dueComplete ? 'completed' : 'not_started',
       dueDate: card.due ? card.due.slice(0, 10) : undefined,

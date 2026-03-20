@@ -69,6 +69,12 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  /* Fix native select/option dropdown styling in dark theme */
+  select option {
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-2);
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;

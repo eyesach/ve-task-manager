@@ -48,20 +48,22 @@ export function TaskRow({ task }: { task: Task }) {
 
       {/* Title + badges */}
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="truncate text-sm text-text-primary group-hover:text-white">
+        <span className="min-w-0 shrink truncate text-sm text-text-primary group-hover:text-white">
           {task.title}
         </span>
-        <PriorityBadge priority={task.priority} />
-        {task.isHighPriority && task.priority !== 'critical' && task.priority !== 'high' && (
-          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
-            HP
-          </span>
-        )}
-        {task.carriedFromPeriod && (
-          <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-400">
-            CARRIED
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <PriorityBadge priority={task.priority} />
+          {task.isHighPriority && task.priority !== 'critical' && task.priority !== 'high' && (
+            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
+              HP
+            </span>
+          )}
+          {task.carriedFromPeriod && (
+            <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-red-400">
+              CARRIED
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Assignees */}

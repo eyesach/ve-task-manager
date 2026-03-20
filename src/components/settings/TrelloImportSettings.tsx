@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, Fragment } from 'react'
 import { Upload, ChevronRight, ChevronLeft, AlertTriangle, CheckCircle, FileJson, Loader2 } from 'lucide-react'
 import { useTaskStore } from '@/stores/taskStore'
 import { usePeriodStore } from '@/stores/periodStore'
@@ -65,7 +65,44 @@ export function TrelloImportSettings() {
 
   const updateMapping = useCallback((listId: string, deptAbbr: string | null) => {
     setMappings((prev) =>
-      prev.map((m) => (m.trelloListId === listId ? { ...m, departmentAbbr: deptAbbr } : m)),
+      prev.map((m) =>
+        m.trelloListId === listId
+          ? {
+              ...m,
+              departmentAbbr: deptAbbr,
+              // Reset inter-dept fields when changing away from ID
+              involvedDepartments: deptAbbr === 'ID' ? (m.involvedDepartments ?? []) : undefined,
+              headDepartmentAbbr: deptAbbr === 'ID' ? m.headDepartmentAbbr : undefined,
+            }
+          : m,
+      ),
+    )
+  }, [])
+
+  const toggleInvolvedDept = useCallback((listId: string, abbr: string) => {
+    setMappings((prev) =>
+      prev.map((m) => {
+        if (m.trelloListId !== listId) return m
+        const current = m.involvedDepartments ?? []
+        const next = current.includes(abbr)
+          ? current.filter((a) => a !== abbr)
+          : [...current, abbr]
+        // If head dept was removed, clear it
+        const head = m.headDepartmentAbbr === abbr && !next.includes(abbr) ? undefined : m.headDepartmentAbbr
+        return { ...m, involvedDepartments: next, headDepartmentAbbr: head }
+      }),
+    )
+  }, [])
+
+  const setHeadDept = useCallback((listId: string, abbr: string) => {
+    setMappings((prev) =>
+      prev.map((m) => {
+        if (m.trelloListId !== listId) return m
+        // Ensure head is in the involved list
+        const current = m.involvedDepartments ?? []
+        const involved = current.includes(abbr) ? current : [...current, abbr]
+        return { ...m, headDepartmentAbbr: abbr, involvedDepartments: involved }
+      }),
     )
   }, [])
 
@@ -168,11 +205,11 @@ export function TrelloImportSettings() {
   // ─── Render ─────────────────────────────────────────────────────────────────
 
   const inputCls =
-    'w-full rounded-md border border-border-default bg-bg-secondary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent'
+    'w-full rounded-md border border-border-default bg-surface-2 px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent'
   const btnPrimary =
     'flex items-center gap-2 rounded-md bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed'
   const btnSecondary =
-    'flex items-center gap-2 rounded-md border border-border-default px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-bg-secondary disabled:opacity-50'
+    'flex items-center gap-2 rounded-md border border-border-default px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-2 disabled:opacity-50'
 
   return (
     <div className="space-y-6">
@@ -203,7 +240,7 @@ export function TrelloImportSettings() {
             Upload a Trello board JSON export. In Trello, go to Menu → More → Print and Export → Export as JSON.
           </p>
 
-          <label className="flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed border-border-default p-8 transition-colors hover:border-accent hover:bg-bg-secondary">
+          <label className="flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed border-border-default p-8 transition-colors hover:border-accent hover:bg-surface-2">
             <Upload className="h-8 w-8 text-text-tertiary" />
             <span className="text-sm text-text-secondary">
               {board ? 'Choose a different file' : 'Click to select a .json file'}
@@ -224,7 +261,7 @@ export function TrelloImportSettings() {
           )}
 
           {board && (
-            <div className="rounded-md border border-border-default bg-bg-secondary p-4">
+            <div className="rounded-md border border-border-default bg-surface-2 p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
                 <FileJson className="h-4 w-4 text-accent" />
                 {boardName}
@@ -243,13 +280,13 @@ export function TrelloImportSettings() {
       {step === 2 && (
         <div className="space-y-4">
           <p className="text-sm text-text-secondary">
-            Map each Trello list to an app department. Lists set to "Skip" will not be imported.
+            Map each Trello list to a department or Inter-Department. Lists set to "Skip" will not be imported.
           </p>
 
           <div className="overflow-hidden rounded-md border border-border-default">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border-default bg-bg-secondary text-left text-xs text-text-tertiary">
+                <tr className="border-b border-border-default bg-surface-2 text-left text-xs text-text-tertiary">
                   <th className="px-4 py-2">Trello List</th>
                   <th className="px-4 py-2 text-center">Cards</th>
                   <th className="px-4 py-2">Map To</th>
@@ -257,26 +294,103 @@ export function TrelloImportSettings() {
               </thead>
               <tbody>
                 {mappings.map((m) => (
-                  <tr key={m.trelloListId} className="border-b border-border-subtle last:border-0">
-                    <td className="px-4 py-2 text-text-primary">{m.trelloListName}</td>
-                    <td className="px-4 py-2 text-center text-text-tertiary">{m.cardCount}</td>
-                    <td className="px-4 py-2">
-                      <select
-                        value={m.departmentAbbr ?? ''}
-                        onChange={(e) =>
-                          updateMapping(m.trelloListId, e.target.value || null)
-                        }
-                        className={inputCls}
-                      >
-                        <option value="">Skip (do not import)</option>
-                        {DEPARTMENTS.map((d) => (
-                          <option key={d.abbreviation} value={d.abbreviation}>
-                            {d.name} ({d.abbreviation})
+                  <Fragment key={m.trelloListId}>
+                    <tr className="border-b border-border-subtle last:border-0">
+                      <td className="px-4 py-2 text-text-primary">{m.trelloListName}</td>
+                      <td className="px-4 py-2 text-center text-text-tertiary">{m.cardCount}</td>
+                      <td className="px-4 py-2">
+                        <select
+                          value={m.departmentAbbr ?? ''}
+                          onChange={(e) =>
+                            updateMapping(m.trelloListId, e.target.value || null)
+                          }
+                          className={inputCls}
+                          style={{ color: '#FAFAFA', backgroundColor: '#18181B' }}
+                        >
+                          <option value="" style={{ color: '#FAFAFA', backgroundColor: '#18181B' }}>
+                            Skip (do not import)
                           </option>
-                        ))}
-                      </select>
-                    </td>
-                  </tr>
+                          <option disabled style={{ color: '#71717A', backgroundColor: '#18181B' }}>
+                            ── Departments ──
+                          </option>
+                          {DEPARTMENTS.map((d) => (
+                            <option
+                              key={d.abbreviation}
+                              value={d.abbreviation}
+                              style={{ color: '#FAFAFA', backgroundColor: '#18181B' }}
+                            >
+                              {d.name} ({d.abbreviation})
+                            </option>
+                          ))}
+                          <option disabled style={{ color: '#71717A', backgroundColor: '#18181B' }}>
+                            ── Other ──
+                          </option>
+                          <option value="ID" style={{ color: '#FAFAFA', backgroundColor: '#18181B' }}>
+                            Inter-Department (ID)
+                          </option>
+                        </select>
+                      </td>
+                    </tr>
+                    {/* Inter-department config row */}
+                    {m.departmentAbbr === 'ID' && (
+                      <tr className="border-b border-border-subtle last:border-0">
+                        <td colSpan={3} className="px-4 py-3">
+                          <div className="rounded-md border border-accent/30 bg-surface-2 p-3">
+                            <p className="mb-2 text-xs font-medium text-text-secondary">
+                              Select involved departments and choose the head department:
+                            </p>
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                              {DEPARTMENTS.map((d) => {
+                                const isInvolved = m.involvedDepartments?.includes(d.abbreviation)
+                                const isHead = m.headDepartmentAbbr === d.abbreviation
+                                return (
+                                  <div
+                                    key={d.abbreviation}
+                                    className={`flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
+                                      isInvolved
+                                        ? 'border-accent/50 bg-accent/10'
+                                        : 'border-border-subtle bg-surface-3 hover:border-border-default'
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={!!isInvolved}
+                                      onChange={() => toggleInvolvedDept(m.trelloListId, d.abbreviation)}
+                                      className="h-3.5 w-3.5 rounded border-border-default accent-accent"
+                                    />
+                                    <span
+                                      className="h-2 w-2 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: d.color }}
+                                    />
+                                    <span className="flex-1 text-text-primary">{d.abbreviation}</span>
+                                    {isInvolved && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setHeadDept(m.trelloListId, d.abbreviation)}
+                                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                                          isHead
+                                            ? 'bg-accent text-white'
+                                            : 'bg-surface-4 text-text-tertiary hover:text-text-secondary'
+                                        }`}
+                                        title={`Set ${d.abbreviation} as head department`}
+                                      >
+                                        {isHead ? 'HEAD' : 'head'}
+                                      </button>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                            {(m.involvedDepartments?.length ?? 0) > 0 && !m.headDepartmentAbbr && (
+                              <p className="mt-2 text-xs text-amber-400">
+                                Please select a head department.
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -301,10 +415,11 @@ export function TrelloImportSettings() {
                   setPreview(null) // reset preview when period changes
                 }}
                 className={inputCls + ' w-64'}
+                style={{ color: '#FAFAFA', backgroundColor: '#18181B' }}
               >
-                <option value="">Select a period...</option>
+                <option value="" style={{ color: '#FAFAFA', backgroundColor: '#18181B' }}>Select a period...</option>
                 {periods.map((p) => (
-                  <option key={p.id} value={p.id}>
+                  <option key={p.id} value={p.id} style={{ color: '#FAFAFA', backgroundColor: '#18181B' }}>
                     {p.name}
                   </option>
                 ))}
