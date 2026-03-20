@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/components/auth/AuthProvider'
 import { LoginPage } from '@/components/auth/LoginPage'
+import { JoinPage } from '@/components/auth/JoinPage'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { AppShell } from '@/components/layout/AppShell'
 import { TaskList } from '@/components/tasks/TaskList'
@@ -46,6 +47,7 @@ export default function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/join/:companyId" element={<JoinPage />} />
           <Route
             path="*"
             element={

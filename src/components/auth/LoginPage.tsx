@@ -96,8 +96,8 @@ export function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-xs text-gray-500">
-            Contact your teacher or admin for an account.
+          <p className="mt-6 text-center text-sm text-gray-500">
+            Need an account? Ask your teacher for an invite link.
           </p>
         </div>
       </div>
