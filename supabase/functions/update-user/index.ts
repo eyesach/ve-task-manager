@@ -58,9 +58,9 @@ serve(async (req) => {
       )
     }
 
-    if (!['teacher', 'admin'].includes(callerProfile.role)) {
+    if (!['teacher', 'admin', 'creator'].includes(callerProfile.role)) {
       return new Response(
-        JSON.stringify({ error: 'Only teachers and admins can update users' }),
+        JSON.stringify({ error: 'Only teachers, admins, and creators can update users' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
